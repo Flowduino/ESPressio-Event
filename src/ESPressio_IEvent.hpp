@@ -14,6 +14,14 @@ namespace ESPressio {
                 static bool operator()(const MyClass& a, const MyClass& b) const {
                     return a._classID < b._classID;
                 }
+
+                static bool operator==(const MyClass& other) const {
+                    return _classID == other._classID;
+                }
+
+                static void tmpSetClassID(uint16_t classId) {
+                    _classId = classId;
+                }
         };
 
     }
