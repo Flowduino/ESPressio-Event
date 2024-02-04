@@ -12,13 +12,9 @@ namespace ESPressio {
             protected:
                 static uint16_t _classId;
             public:
-                static uint16_t GetClassID() {
-                    return _classId;
-                }
+                static uint16_t GetClassID();
 
-                static void tmpSetClassID(uint16_t classId) {
-                    _classId = classId;
-                }
+                static void tmpSetClassID(uint16_t classId);
         };
 
     }
