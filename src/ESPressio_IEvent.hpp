@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ESPressio_Persistent.hpp>
+#include <cstdint>
 
 using namespace ESPressio::Base;
 namespace ESPressio {
@@ -8,15 +9,11 @@ namespace ESPressio {
     namespace Event {
 
         class IEvent : public Persistent<IEvent> {
-            private:
-                static uint16_t _classId = 0;
+            protected:
+                static uint16_t _classId;
             public:
-                static bool operator()(const MyClass& a, const MyClass& b) const {
-                    return a._classID < b._classID;
-                }
-
-                static bool operator==(const MyClass& other) const {
-                    return _classID == other._classID;
+                static uint16_t GetClassID() {
+                    return _classId;
                 }
 
                 static void tmpSetClassID(uint16_t classId) {
