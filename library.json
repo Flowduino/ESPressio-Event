@@ -16,15 +16,9 @@
     "platforms": "*",
     "dependencies": [
         {
-            "name": "Flowduino ESPressio-Base",
-            "version": "0.0.1",
-            "url": "https://github.com/Flowduino/ESPressio-Base.git",
-            "platforms": "*"
-        },
-        {
             "name": "Flowduino ESPressio-Threads",
             "version": "0.0.1",
-            "url": "https://github.com/Flowduino/ESPressio-Base.git",
+            "url": "https://github.com/Flowduino/ESPressio-Threads.git",
             "platforms": "espressif32,espressif8266"
         }
     ]
