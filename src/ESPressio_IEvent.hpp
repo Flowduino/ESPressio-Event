@@ -5,9 +5,7 @@
 #include <ESPressio_ThreadSafe.hpp>
 
 #include "ESPressio_EventEnums.hpp"
-#include <ESPressio_Object.hpp>
 
-using namespace ESPressio::Base;
 using namespace ESPressio::Threads;
 
 #define ESPRESSIO_EVENT_STRICT_THREADSAFE

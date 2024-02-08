@@ -8,7 +8,6 @@
 #include "ESPressio_EventEnums.hpp"
 #include "ESPressio_EventManager.hpp"
 
-using namespace ESPressio::Base;
 using namespace ESPressio::Threads;
 
 namespace ESPressio {

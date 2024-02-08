@@ -7,12 +7,9 @@
 #include <typeinfo>
 #include <typeindex>
 
-#include <ESPressio_Persistent.hpp>
-#include <ESPressio_Object.hpp>
 #include "ESPressio_EventEnums.hpp"
 #include "ESPressio_IEvent.hpp"
 
-using namespace ESPressio::Base;
 
 namespace ESPressio {
 

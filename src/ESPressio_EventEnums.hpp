@@ -2,7 +2,6 @@
 
 #include <functional>
 
-
 namespace ESPressio {
 
     namespace Event {

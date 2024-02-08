@@ -15,7 +15,6 @@
 #include "ESPressio_IEvent.hpp"
 #include "ESPressio_EventEnums.hpp"
 
-using namespace ESPressio::Base;
 
 namespace ESPressio {
 
