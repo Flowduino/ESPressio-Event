@@ -3,7 +3,7 @@
 #include <ESPressio_Thread.hpp>
 #include "ESPressio_EventDispatcher.hpp"
 
-using namespace ESPressio::Thread;
+using namespace ESPressio::Threads;
 
 namespace ESPressio {
 
