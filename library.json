@@ -6,6 +6,11 @@
         "name": "Flowduino",
         "maintainer": true
     },
+    "build": {
+        "flags": [
+            "-frtti"
+        ]
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/Flowduino/ESPressio-Event.git"
