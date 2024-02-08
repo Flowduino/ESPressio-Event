@@ -34,6 +34,17 @@ Please see the [![License](https://img.shields.io/badge/License-Apache%202.0-blu
 ## Namespace
 Every type/variable/constant/etc. related to *ESPressio* Event are located within the `Event` submaspace of the `ESPressio` parent namespace.
 
+The namespace provides the following (*click on any declaration to navigate to more info*):
+- [`ESPressio::Event::IEvent`](#ievent)
+- [`ESPressio::Event::Event`](#event)
+- [`ESPressio::Event::IEventThread`](#ieventthread)
+- [`ESPressio::Event::EventThread`](#eventthread)
+
+## Dependencies
+The ESPressio Event library has an internal dependency, which is the [`ESPressio Threads library`](http://github.com/Flowduino/ESPressio-Threads).
+
+This library for Event-Driven Development (EDD) builds upon the Threading library directly, so please pay attention to include both libraries in your projects.
+
 ## Platformio.ini
 You can quickly and easily add this library to your project in PlatformIO by simply including the following in your `platformio.ini` file:
 
@@ -46,3 +57,9 @@ lib_deps =
 Please note that this will use the very latest commits pushed into the repository, so volatility is possible.
 This will of course be resolved when the first release version is tagged and published.
 This section of the README will be updated concurrently with each release.
+
+## What is "Event-Driven" Development?
+Event-Driven Development is a means of fully (and truly) decoupling your code from each distinct functionality.
+
+By Dispatching "Events" (*through a Queue or a Stack, see later*) containing context-specific "payload" information, and having separate code *Listen* for those Events, we are able to ensure that no direct relationship need exist between either distinct functionality.
+In this way, distinct functionalities can be developed in total indepdenence of each other, and all that need be agreed are the Events that will be Dispatched and Received. 
