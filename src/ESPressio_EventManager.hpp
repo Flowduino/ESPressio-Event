@@ -1,6 +1,9 @@
 #pragma once
 
+#include <ESPressio_Thread>
 #include "ESPressio_EventDispatcher.hpp"
+
+using namespace ESPressio::Thread;
 
 namespace ESPressio {
 
