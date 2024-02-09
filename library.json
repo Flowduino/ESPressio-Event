@@ -9,6 +9,7 @@
     "build": {
         "flags": [
             "-frtti"
+            "-dESPRESSIO_EVENT"
         ]
     },
     "repository": {
