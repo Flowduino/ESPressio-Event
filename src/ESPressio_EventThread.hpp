@@ -66,7 +66,7 @@ namespace ESPressio {
 
                 virtual void OnThreadLoop() = 0;
             public:
-                EventThreadBase(bool freeOnTerminate) : Thread(freeOnTerminate) { }
+                EventThreadWithLoop(bool freeOnTerminate) : Thread(freeOnTerminate) { }
 
                 virtual ~EventThreadBase() {
 
