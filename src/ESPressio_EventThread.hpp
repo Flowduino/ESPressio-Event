@@ -1,8 +1,12 @@
 #pragma once
 
+#include <ESPressio_Thread.hpp>
+
 #include <ESPressio_EventThreadBase.hpp>
 #include "ESPressio_EventListener.hpp"
 #include "ESPressio_EventManager.hpp"
+
+using namespace ESPressio::Threads;
 
 namespace ESPressio {
 
@@ -33,6 +37,44 @@ namespace ESPressio {
                 virtual ~EventThread() {
 
                 }
+        };
+
+        enum EventThreadProcessOrder {
+            EventsBeforeLoop,
+            EventsAfterLoop
+        };
+
+        class EventThreadWithLoop : public Thread, public EventReceiver, public IEventThreadBase, public EventListener, public IEventThread {
+            private:
+                EventThreadProcessOrder _processOrder = EventThreadProcessOrder::EventsBeforeLoop;
+            protected:
+                void OnLoop() override {
+                    if (_processOrder == EventThreadProcessOrder::EventsBeforeLoop) {
+                        WithEvents([&](IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
+                            ProcessEvent(event, dispatchMethod, priority);
+                        });
+                    }
+
+                    OnThreadLoop();
+
+                    if (_processOrder == EventThreadProcessOrder::EventsAfterLoop) {
+                        WithEvents([&](IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
+                            ProcessEvent(event, dispatchMethod, priority);
+                        });
+                    }
+                }
+
+                virtual void OnThreadLoop() = 0;
+            public:
+                EventThreadBase(bool freeOnTerminate) : Thread(freeOnTerminate) { }
+
+                virtual ~EventThreadBase() {
+
+                }
+
+                EventThreadProcessOrder GetProcessOrder() { return _processOrder; }
+
+                void SetProcessOrder(EventThreadProcessOrder processOrder) { _processOrder = processOrder; }
         };
 
     }
