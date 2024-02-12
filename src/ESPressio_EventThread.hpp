@@ -26,6 +26,8 @@ namespace ESPressio {
                     EventManager::GetInstance()->UnregisterReceiver(eventType, this);
                 }
             public:
+                virtual String GetThreadNamePrefix() const { return "eventthread"; }
+
                 EventThread(bool freeOnTerminate) : EventThreadBase(freeOnTerminate) { }
 
                 virtual ~EventThread() {
