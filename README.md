@@ -32,7 +32,7 @@ ESPressio (and its component libraries, including this one) are subject to the *
 Please see the [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE) accompanying this library for full details.
 
 ## Namespace
-Every type/variable/constant/etc. related to *ESPressio* Event are located within the `Event` submaspace of the `ESPressio` parent namespace.
+Every type/variable/constant/etc. related to *ESPressio* Event are located within the `Event` sub-namespace of the `ESPressio` parent namespace.
 
 The namespace provides the following (*click on any declaration to navigate to more info*):
 - [`ESPressio::Event::IEvent`](#ievent)
