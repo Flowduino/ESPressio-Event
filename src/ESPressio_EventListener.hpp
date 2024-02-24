@@ -18,9 +18,9 @@ namespace ESPressio {
 
     namespace Event {
 
-        class IEventListenerHandler {
+        class IEventListenerHandle {
             public:
-                virtual ~IEventListenerHandler() { };
+                virtual ~IEventListenerHandle() { };
                 virtual void Unregister() = 0;
                 virtual bool IsRegistered() const = 0;
         };
@@ -33,7 +33,7 @@ namespace ESPressio {
             public:
                 virtual ~IEventListener() { }
 
-                virtual IEventListenerHandler* RegisterListener(
+                virtual IEventListenerHandle* RegisterListener(
                     std::type_index eventType,
                     std::function<void(
                         IEvent*,
@@ -46,7 +46,7 @@ namespace ESPressio {
                 ) = 0;
 
                 template <typename EventType>
-                IEventListenerHandler* RegisterListener(
+                IEventListenerHandle* RegisterListener(
                     std::function<void(
                         IEvent*,
                         EventDispatchMethod dispatchMethod,
@@ -56,19 +56,19 @@ namespace ESPressio {
                         std::function<bool(IEvent*)> customInterestCallback = nullptr
                 );
 
-                virtual void UnregisterListener(std::type_index eventType, IEventListenerHandler* handler) = 0;
+                virtual void UnregisterListener(std::type_index eventType, IEventListenerHandle* handler) = 0;
 
                 template <typename EventType>
-                void UnregisterListener(IEventListenerHandler* handler);
+                void UnregisterListener(IEventListenerHandle* handler);
         };
 
         /*
-            `EventListenerHandler` is returned when invoking `RegisterListener` against any implementor of `IEventListener`.
+            `EventListenerHandle` is returned when invoking `RegisterListener` against any implementor of `IEventListener`.
             This class is used to manage the lifetime of the Listener and to unregister the Listener when it is no longer needed.
             You should retain your reference to this Handler and call `Unregister` against it when you are done with the Listener (and on your objects' Destructor if applicable).
-            DON'T FORGET: YOUR code takes ownership of the EventListenerHandler, and you must destroy (`delete`) it when you are done with it.
+            DON'T FORGET: YOUR code takes ownership of the EventListenerHandle, and you must destroy (`delete`) it when you are done with it.
         */
-        class EventListenerHandler : public IEventListenerHandler {
+        class EventListenerHandle : public IEventListenerHandle {
             private:
                 ReadWriteMutex<bool>* _isRegistered = new ReadWriteMutex(true); // _isRegistered can be altered by multiple threads, so we need to protect it with a Mutex
                 IEventListener* _listener; // This is a Weak Reference to the Listener (it will be nullified automatically when the Event Listener is destroyed)
@@ -76,12 +76,12 @@ namespace ESPressio {
             public:
             // Constructor/Deconstructor
 
-                EventListenerHandler(std::type_index eventType, IEventListener* listener) : _eventType(eventType), _listener(listener) { }
+                EventListenerHandle(std::type_index eventType, IEventListener* listener) : _eventType(eventType), _listener(listener) { }
 
                 template <typename EventType>
-                EventListenerHandler(IEventListener* listener) : _eventType(typeid(EventType)), _listener(listener) { }
+                EventListenerHandle(IEventListener* listener) : _eventType(typeid(EventType)), _listener(listener) { }
                 
-                ~EventListenerHandler() override {
+                ~EventListenerHandle() override {
                     Unregister();
                     delete _isRegistered;
                 }
@@ -113,7 +113,7 @@ namespace ESPressio {
                 class IEventListenerContainer {
                     public:
                         virtual ~IEventListenerContainer() { }
-                        virtual IEventListenerHandler* GetListenerHandler() const = 0;
+                        virtual IEventListenerHandle* GetListenerHandler() const = 0;
                         virtual IEventListener* GetRequester() const = 0;
                         virtual EventListenerInterest GetInterest() const = 0;
                         virtual unsigned long GetMaximumTimeSinceDispatch() const = 0;
@@ -123,7 +123,7 @@ namespace ESPressio {
                 template <typename EventType>
                 class EventListenerContainer : public IEventListenerContainer {
                     private:
-                        IEventListenerHandler* _listenerHandler;
+                        IEventListenerHandle* _listenerHandler;
                         IEventListener* _requester; // We will use this to determine if the requester is still alive
                         std::function<void(EventType*, EventDispatchMethod dispatchMethod, EventPriority priority)> _callback;
                         EventListenerInterest _interest = EventListenerInterest::All; // Default to All
@@ -139,7 +139,7 @@ namespace ESPressio {
                                 EventDispatchMethod dispatchMethod,
                                 EventPriority priority
                             )> callback,
-                            IEventListenerHandler* listenerHandler,
+                            IEventListenerHandle* listenerHandler,
                             EventListenerInterest interest = EventListenerInterest::All,
                             unsigned long maximumTimeSinceDispatch = 0,
                             std::function<bool(EventType*)> customInterestCallback = nullptr
@@ -153,7 +153,7 @@ namespace ESPressio {
 
                     // Getters
 
-                        IEventListenerHandler* GetListenerHandler() const { return _listenerHandler; }
+                        IEventListenerHandle* GetListenerHandler() const { return _listenerHandler; }
                         IEventListener* GetRequester() const { return _requester; }
                         inline std::function<void(EventType*, EventDispatchMethod dispatchMethod, EventPriority priority)> GetCallback() const { return _callback; }
                         EventListenerInterest GetInterest() const { return _interest; }
@@ -205,7 +205,7 @@ namespace ESPressio {
                     _eventListenersMutex.unlock();
                 }
 
-                IEventListenerHandler* RegisterListener(
+                IEventListenerHandle* RegisterListener(
                     std::type_index eventType,
                     std::function<void(
                         IEvent*,
@@ -220,7 +220,7 @@ namespace ESPressio {
                     _eventListenersMutex.lock(); // Because we MIGHT be adding a new Listeners collection, we need to exclusively lock the Mutex
                     EventListeners* typeListeners = GetListenersForEventType(eventType); // Get the Listeners collection for this Event Type (will create the Listeners collection if it doesn't exist)
 
-                    IEventListenerHandler* handler = new EventListenerHandler(eventType, this);
+                    IEventListenerHandle* handler = new EventListenerHandle(eventType, this);
 
                     EventListenerContainer<IEvent>* listener = new EventListenerContainer<IEvent>(this, callback, handler, interest, maximumTimeSinceDispatch, customInterestCallback); // Create a new Listener (EventListenerContainer)
 
@@ -232,7 +232,7 @@ namespace ESPressio {
                 }
 
                 template <typename EventType>
-                IEventListenerHandler* RegisterListener(
+                IEventListenerHandle* RegisterListener(
                     std::function<void(
                         EventType*,
                         EventDispatchMethod dispatchMethod,
@@ -245,7 +245,7 @@ namespace ESPressio {
                     _eventListenersMutex.lock(); // Because we MIGHT be adding a new Listeners collection, we need to exclusively lock the Mutex
                     std::type_index eventType = typeid(EventType);
                     EventListeners* typeListeners = GetListenersForEventType(eventType); // Get the Listeners collection for this Event Type (will create the Listeners collection if it doesn't exist)
-                    IEventListenerHandler* handler = new EventListenerHandler(eventType, this);
+                    IEventListenerHandle* handler = new EventListenerHandle(eventType, this);
     
                     EventListenerContainer<EventType>* listener = new EventListenerContainer<EventType>(this, callback, handler, interest, maximumTimeSinceDispatch, customInterestCallback); // Create a new Listener (EventListenerContainer)
 
@@ -257,7 +257,7 @@ namespace ESPressio {
                     return handler;
                 }
 
-                void UnregisterListener(std::type_index eventType, IEventListenerHandler* handler) {
+                void UnregisterListener(std::type_index eventType, IEventListenerHandle* handler) {
                     _eventListenersMutex.lock(); // Because we MIGHT be removing the Listeners collection, we need to exclusively lock the Mutex
                     EventListeners* typeListeners = _eventListeners[eventType]; // Get the Listeners collection for this Event Type
                     if (typeListeners == nullptr) {
@@ -266,7 +266,7 @@ namespace ESPressio {
                     }
                     for (auto it = typeListeners->begin(); it != typeListeners->end(); it++) {
                         if ((*it)->GetListenerHandler() == handler) {
-                            static_cast<EventListenerHandler*>(handler)->ForceUnregister(); // Forcibly Unregister the Handle
+                            static_cast<EventListenerHandle*>(handler)->ForceUnregister(); // Forcibly Unregister the Handle
                             delete *it; // Delete the Listener
                             typeListeners->erase(it);
                             break;
@@ -281,7 +281,7 @@ namespace ESPressio {
                 }
 
                 template <typename EventType>
-                void UnregisterListener(IEventListenerHandler* handler) {
+                void UnregisterListener(IEventListenerHandle* handler) {
                     std::type_index eventType = typeid(EventType);
                     UnregisterListener(eventType, handler);
                 }

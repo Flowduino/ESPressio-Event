@@ -1,10 +1,11 @@
 {
-    "name": "Flowduino ESPressio-Observable",
+    "name": "ESPressio-Observable",
     "description": "Event-Pattern Library intended for use with all microcontrollers",
     "keywords": "event,events,event-driven,event pattern,pattern,design pattern,async,callback,watcher,notifier,espressio",
     "authors": {
         "name": "Flowduino",
-        "maintainer": true
+        "maintainer": true,
+        "url": "https://flowduino.com"
     },
     "build": {
         "flags": [
@@ -16,14 +17,14 @@
         "type": "git",
         "url": "https://github.com/Flowduino/ESPressio-Event.git"
     },
-    "version": "0.0.1",
+    "version": "1.0.0",
     "license": "Apache-2.0",
-    "frameworks": "arduino",
+    "frameworks": "*",
     "platforms": "*",
     "dependencies": [
         {
             "name": "Flowduino ESPressio-Threads",
-            "version": "0.0.1",
+            "version": "1.0.0",
             "url": "https://github.com/Flowduino/ESPressio-Threads.git",
             "platforms": "espressif32,espressif8266"
         }
