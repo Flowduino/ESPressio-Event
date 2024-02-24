@@ -9,7 +9,7 @@
     },
     "build": {
         "flags": [
-            "-frtti"
+            "-frtti",
             "-dESPRESSIO_EVENT"
         ]
     },
