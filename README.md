@@ -244,7 +244,7 @@ We'll create another header file named `TemperatureSerialLogger.hpp`:
 
 #include <ESPressio_EventThread.hpp>
 #include <ESPressio_EventEnums.hpp>
-#include "TemperatureChangeEvent.hpp> // < contains our Event
+#include "TemperatureChangeEvent.hpp" // < contains our Event
 
 using namespace ESPressio::Event;
 
@@ -282,7 +282,7 @@ We'll create another header file named `TemperatureDisplay.hpp`:
 
 #include <ESPressio_EventThread.hpp>
 #include <ESPressio_EventEnums.hpp>
-#include "TemperatureChangeEvent.hpp> // < contains our Event
+#include "TemperatureChangeEvent.hpp" // < contains our Event
 
 using namespace ESPressio::Event;
 
@@ -310,7 +310,7 @@ We'll create another header file named `Thermometer.hpp`:
 ```cpp
 #pragma once
 
-#include "TemperatureChangeEvent.hpp> // < contains our Event
+#include "TemperatureChangeEvent.hpp" // < contains our Event
 
 class Thermometer {
     private:
