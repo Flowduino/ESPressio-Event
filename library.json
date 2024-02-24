@@ -1,5 +1,5 @@
 {
-    "name": "ESPressio-Observable",
+    "name": "ESPressio-Event",
     "description": "Event-Pattern Library intended for use with all microcontrollers",
     "keywords": "event,events,event-driven,event pattern,pattern,design pattern,async,callback,watcher,notifier,espressio",
     "authors": {
