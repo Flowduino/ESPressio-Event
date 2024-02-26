@@ -385,4 +385,8 @@ Yes! You can register as many `EventListener`s for as many `Event` types as each
 * Expand this README.MD with more information and examples
   * Demonstrate `EventPriority` in more detail
   * Demonstrate examples where conventional *Observer Pattern* is a better option than *Event-Driven Observer Pattern*.
-* Add example projects to the "examples" folder
+  * Add example projects to the "examples" folder
+
+# Extensions for ESPressio Event
+The following Extensions are available for the ESPressio Event library:
+* [ESPressio Event Exchange](#) (*currently unavailable*) - Components facilitating the exchange of `Event`s between devices (even across different architectures).
