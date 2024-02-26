@@ -10,7 +10,10 @@
     "build": {
         "flags": [
             "-frtti",
-            "-dESPRESSIO_EVENT"
+            "-DESPRESSIO_EVENT"
+        ],
+        "unflags": [
+            "-fno-rtti"
         ]
     },
     "repository": {
