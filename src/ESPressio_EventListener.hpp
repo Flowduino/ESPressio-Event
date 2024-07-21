@@ -83,7 +83,8 @@ namespace ESPressio {
                 
                 ~EventListenerHandle() override {
                     Unregister();
-                    delete _isRegistered;
+                    // delete _isRegistered; // This will cause complaints on the ESP-IDF...
+                    _isRegistered = nullptr; // ... whereas this causes no complaints, but requires proper testing on both ESP-IDF and Arduino platforms!
                 }
 
             // Methods
