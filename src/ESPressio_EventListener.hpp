@@ -71,8 +71,8 @@ namespace ESPressio {
         class EventListenerHandle : public IEventListenerHandle {
             private:
                 ReadWriteMutex<bool>* _isRegistered = new ReadWriteMutex(true); // _isRegistered can be altered by multiple threads, so we need to protect it with a Mutex
-                IEventListener* _listener; // This is a Weak Reference to the Listener (it will be nullified automatically when the Event Listener is destroyed)
                 std::type_index _eventType; // This is the Event Type (Hash) which we can use to quickly look up the Listeners for this Event Type
+                IEventListener* _listener; // This is a Weak Reference to the Listener (it will be nullified automatically when the Event Listener is destroyed)
             public:
             // Constructor/Deconstructor
 
@@ -123,9 +123,9 @@ namespace ESPressio {
                 template <typename EventType>
                 class EventListenerContainer : public IEventListenerContainer {
                     private:
-                        IEventListenerHandle* _listenerHandler;
                         IEventListener* _requester; // We will use this to determine if the requester is still alive
                         std::function<void(EventType*, EventDispatchMethod dispatchMethod, EventPriority priority)> _callback;
+                        IEventListenerHandle* _listenerHandler;
                         EventListenerInterest _interest = EventListenerInterest::All; // Default to All
                         unsigned long _maximumTimeSinceDispatch = 0; // Default to 0 because we only use this if the interest is YoungerThan
                         std::function<bool(EventType*)> _customInterestCallback = nullptr; // Default to nullptr because we only use this Callback if the interest is Custom
