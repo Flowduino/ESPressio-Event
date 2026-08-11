@@ -35,7 +35,7 @@ namespace ESPressio {
                 EventThread(bool freeOnTerminate) : EventThreadBase(freeOnTerminate) { }
 
                 virtual ~EventThread() {
-
+                    UnregisterAllListeners();
                 }
         };
 
@@ -65,11 +65,19 @@ namespace ESPressio {
                 }
 
                 virtual void OnThreadLoop() = 0;
+
+                void OnListenerRegistered(std::type_index eventType) override {
+                    EventManager::GetInstance()->RegisterReceiver(eventType, this);
+                }
+
+                void OnListenerUnregistered(std::type_index eventType) override {
+                    EventManager::GetInstance()->UnregisterReceiver(eventType, this);
+                }
             public:
                 EventThreadWithLoop(bool freeOnTerminate) : Thread(freeOnTerminate) { }
 
                 virtual ~EventThreadWithLoop() {
-
+                    UnregisterAllListeners();
                 }
 
                 EventThreadProcessOrder GetProcessOrder() { return _processOrder; }

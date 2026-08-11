@@ -6,6 +6,7 @@
 
 #include "ESPressio_IEvent.hpp"
 #include "ESPressio_EventEnums.hpp"
+#include "ESPressio_EventObserver.hpp"
 #include "ESPressio_EventManager.hpp"
 
 using namespace ESPressio::Threads;

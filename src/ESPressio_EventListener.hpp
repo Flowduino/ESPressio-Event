@@ -7,11 +7,14 @@
 #include <unordered_map>
 #include <functional>
 #include <shared_mutex>
+#include <vector>
 
 #include <ESPressio_ThreadSafe.hpp>
+#include <ESPressio_IObservable.hpp>
 
 #include "ESPressio_IEvent.hpp"
 #include "ESPressio_EventEnums.hpp"
+#include "ESPressio_EventObserver.hpp"
 
 
 namespace ESPressio {
@@ -56,6 +59,45 @@ namespace ESPressio {
                         std::function<bool(IEvent*)> customInterestCallback = nullptr
                 );
 
+                /// Registers a typed Observer using the same asynchronous Event
+                /// pipeline and lifetime handle as callback-based listeners.
+                template <typename EventType>
+                IEventListenerHandle* RegisterObserver(
+                    IEventObserver<EventType>* observer,
+                    EventListenerInterest interest = EventListenerInterest::All,
+                    unsigned long maximumTimeSinceDispatch = 0
+                ) {
+                    if (observer == nullptr) {
+                        throw Observable::InvalidObserverRegistrationException();
+                    }
+
+                    std::function<bool(IEvent*)> customInterestCallback = nullptr;
+                    if (interest == EventListenerInterest::Custom) {
+                        customInterestCallback = [observer](IEvent* event) {
+                            EventType* typedEvent = dynamic_cast<EventType*>(event);
+                            return typedEvent != nullptr &&
+                                observer->IsInterestedInEvent(typedEvent);
+                        };
+                    }
+
+                    return RegisterListener(
+                        std::type_index(typeid(EventType)),
+                        [observer](
+                            IEvent* event,
+                            EventDispatchMethod dispatchMethod,
+                            EventPriority priority) {
+                            EventType* typedEvent = dynamic_cast<EventType*>(event);
+                            if (typedEvent != nullptr) {
+                                observer->OnEvent(
+                                    typedEvent, dispatchMethod, priority);
+                            }
+                        },
+                        interest,
+                        maximumTimeSinceDispatch,
+                        customInterestCallback
+                    );
+                }
+
                 virtual void UnregisterListener(std::type_index eventType, IEventListenerHandle* handler) = 0;
 
                 template <typename EventType>
@@ -70,7 +112,7 @@ namespace ESPressio {
         */
         class EventListenerHandle : public IEventListenerHandle {
             private:
-                ReadWriteMutex<bool>* _isRegistered = new ReadWriteMutex(true); // _isRegistered can be altered by multiple threads, so we need to protect it with a Mutex
+                mutable ReadWriteMutex<bool> _isRegistered = ReadWriteMutex<bool>(true);
                 std::type_index _eventType; // This is the Event Type (Hash) which we can use to quickly look up the Listeners for this Event Type
                 IEventListener* _listener; // This is a Weak Reference to the Listener (it will be nullified automatically when the Event Listener is destroyed)
             public:
@@ -83,24 +125,22 @@ namespace ESPressio {
                 
                 ~EventListenerHandle() override {
                     Unregister();
-                    // delete _isRegistered; // This will cause complaints on the ESP-IDF...
-                    _isRegistered = nullptr; // ... whereas this causes no complaints, but requires proper testing on both ESP-IDF and Arduino platforms!
                 }
 
             // Methods
                 // Will safely `Unregister` the Listener
-                void Unregister() {
-                    if (!_isRegistered->Get() || _listener == nullptr) { return; } // If the Listener is already Unregistered, or the Listener is no longer alive, then we don't need to do anything
+                void Unregister() override {
+                    if (!_isRegistered.Get() || _listener == nullptr) { return; } // If the Listener is already Unregistered, or the Listener is no longer alive, then we don't need to do anything
                     _listener->UnregisterListener(_eventType, this);
-                    _isRegistered->Set(false);
+                    _isRegistered.Set(false);
                 }
 
             // Getters
                 
-                bool IsRegistered() const { return _isRegistered->Get(); }
+                bool IsRegistered() const override { return _isRegistered.Get(); }
 
                 void ForceUnregister() {
-                    _isRegistered->Set(false);
+                    _isRegistered.Set(false);
                     _listener = nullptr;
                 }
         };
@@ -118,6 +158,11 @@ namespace ESPressio {
                         virtual IEventListener* GetRequester() const = 0;
                         virtual EventListenerInterest GetInterest() const = 0;
                         virtual unsigned long GetMaximumTimeSinceDispatch() const = 0;
+                        virtual void ProcessEvent(
+                            IEvent* event,
+                            EventDispatchMethod dispatchMethod,
+                            EventPriority priority
+                        ) = 0;
                 };
 
                 /// `EventListenerContainer` is a class which holds all information about a specific Listener for a specific Event Type.
@@ -154,12 +199,33 @@ namespace ESPressio {
 
                     // Getters
 
-                        IEventListenerHandle* GetListenerHandler() const { return _listenerHandler; }
-                        IEventListener* GetRequester() const { return _requester; }
+                        IEventListenerHandle* GetListenerHandler() const override { return _listenerHandler; }
+                        IEventListener* GetRequester() const override { return _requester; }
                         inline std::function<void(EventType*, EventDispatchMethod dispatchMethod, EventPriority priority)> GetCallback() const { return _callback; }
-                        EventListenerInterest GetInterest() const { return _interest; }
-                        unsigned long GetMaximumTimeSinceDispatch() const { return _maximumTimeSinceDispatch; }
+                        EventListenerInterest GetInterest() const override { return _interest; }
+                        unsigned long GetMaximumTimeSinceDispatch() const override { return _maximumTimeSinceDispatch; }
                         std::function<bool(EventType*)> GetCustomInterestCallback() const { return _customInterestCallback; }
+
+                        void ProcessEvent(
+                            IEvent* event,
+                            EventDispatchMethod dispatchMethod,
+                            EventPriority priority) override {
+                            EventType* typedEvent = dynamic_cast<EventType*>(event);
+                            if (typedEvent == nullptr) { return; }
+
+                            bool interested = _interest == EventListenerInterest::All;
+                            if (_interest == EventListenerInterest::YoungerThan) {
+                                interested = event->GetTimeSinceDispatch() <
+                                    _maximumTimeSinceDispatch;
+                            } else if (_interest == EventListenerInterest::Custom) {
+                                interested = _customInterestCallback != nullptr &&
+                                    _customInterestCallback(typedEvent);
+                            }
+
+                            if (interested) {
+                                _callback(typedEvent, dispatchMethod, priority);
+                            }
+                        }
 
                     // Setters
 
@@ -170,7 +236,7 @@ namespace ESPressio {
                         void SetCustomInterestCallback(std::function<bool(EventType*)> customInterestCallback) { _customInterestCallback = customInterestCallback; }
                 };
 
-                typedef std::vector<IEventListenerContainer*> EventListeners;
+                typedef std::vector<std::shared_ptr<IEventListenerContainer>> EventListeners;
                 typedef std::unordered_map<std::type_index, EventListeners*> EventListenersMap;
 
                 /// This is a map of Event Types to a collection of Listeners for that Event Type
@@ -189,21 +255,38 @@ namespace ESPressio {
 
             protected:
 
-                inline virtual void OnListenerRegistered(std::type_index eventType) { }
+                inline virtual void OnListenerRegistered(std::type_index eventType) {
+                    (void)eventType;
+                }
 
-                inline virtual void OnListenerUnregistered(std::type_index eventType) { }
+                inline virtual void OnListenerUnregistered(std::type_index eventType) {
+                    (void)eventType;
+                }
+
+                void UnregisterAllListeners() {
+                    std::vector<std::type_index> eventTypes;
+                    {
+                        std::unique_lock<std::shared_mutex> lock(_eventListenersMutex);
+                        eventTypes.reserve(_eventListeners.size());
+                        for (auto& listenersForType : _eventListeners) {
+                            eventTypes.push_back(listenersForType.first);
+                            for (const auto& listener : *listenersForType.second) {
+                                static_cast<EventListenerHandle*>(
+                                    listener->GetListenerHandler())->ForceUnregister();
+                            }
+                            delete listenersForType.second;
+                        }
+                        _eventListeners.clear();
+                    }
+
+                    for (const std::type_index& eventType : eventTypes) {
+                        OnListenerUnregistered(eventType);
+                    }
+                }
 
             public:
                 virtual ~EventListener() {
-                    _eventListenersMutex.lock();
-                    for (auto it = _eventListeners.begin(); it != _eventListeners.end(); it++) {
-                        for (auto listener : *it->second) {
-                            delete listener;
-                        }
-                        delete it->second;
-                    }
-                    _eventListeners.clear();
-                    _eventListenersMutex.unlock();
+                    UnregisterAllListeners();
                 }
 
                 IEventListenerHandle* RegisterListener(
@@ -218,18 +301,22 @@ namespace ESPressio {
                     std::function<bool(IEvent*)> customInterestCallback = nullptr
 
                 ) override {
-                    _eventListenersMutex.lock(); // Because we MIGHT be adding a new Listeners collection, we need to exclusively lock the Mutex
+                    std::unique_ptr<EventListenerHandle> handler(
+                        new EventListenerHandle(eventType, this));
+                    std::unique_lock<std::shared_mutex> lock(_eventListenersMutex);
                     EventListeners* typeListeners = GetListenersForEventType(eventType); // Get the Listeners collection for this Event Type (will create the Listeners collection if it doesn't exist)
+                    const bool isFirstListener = typeListeners->empty();
 
-                    IEventListenerHandle* handler = new EventListenerHandle(eventType, this);
+                    std::shared_ptr<EventListenerContainer<IEvent>> listener =
+                        std::make_shared<EventListenerContainer<IEvent>>(
+                            this, callback, handler.get(), interest,
+                            maximumTimeSinceDispatch, customInterestCallback);
 
-                    EventListenerContainer<IEvent>* listener = new EventListenerContainer<IEvent>(this, callback, handler, interest, maximumTimeSinceDispatch, customInterestCallback); // Create a new Listener (EventListenerContainer)
+                    typeListeners->push_back(listener);
 
-                    typeListeners->push_back(listener); // Add it into the collection
-
-                    OnListenerRegistered(eventType);
-                    _eventListenersMutex.unlock();
-                    return handler;
+                    lock.unlock();
+                    if (isFirstListener) { OnListenerRegistered(eventType); }
+                    return handler.release();
                 }
 
                 template <typename EventType>
@@ -243,42 +330,53 @@ namespace ESPressio {
                         std::function<bool(EventType*)> customInterestCallback = nullptr
 
                 ) {
-                    _eventListenersMutex.lock(); // Because we MIGHT be adding a new Listeners collection, we need to exclusively lock the Mutex
                     std::type_index eventType = typeid(EventType);
-                    EventListeners* typeListeners = GetListenersForEventType(eventType); // Get the Listeners collection for this Event Type (will create the Listeners collection if it doesn't exist)
-                    IEventListenerHandle* handler = new EventListenerHandle(eventType, this);
-    
-                    EventListenerContainer<EventType>* listener = new EventListenerContainer<EventType>(this, callback, handler, interest, maximumTimeSinceDispatch, customInterestCallback); // Create a new Listener (EventListenerContainer)
+                    std::unique_ptr<EventListenerHandle> handler(
+                        new EventListenerHandle(eventType, this));
+                    std::unique_lock<std::shared_mutex> lock(_eventListenersMutex);
+                    EventListeners* typeListeners = GetListenersForEventType(eventType);
+                    const bool isFirstListener = typeListeners->empty();
 
-                    typeListeners->push_back(listener); // Add it into the collection
+                    std::shared_ptr<EventListenerContainer<EventType>> listener =
+                        std::make_shared<EventListenerContainer<EventType>>(
+                            this, callback, handler.get(), interest,
+                            maximumTimeSinceDispatch, customInterestCallback);
 
-                    OnListenerRegistered(eventType);
+                    typeListeners->push_back(listener);
 
-                    _eventListenersMutex.unlock();
-                    return handler;
+                    lock.unlock();
+                    if (isFirstListener) { OnListenerRegistered(eventType); }
+                    return handler.release();
                 }
 
-                void UnregisterListener(std::type_index eventType, IEventListenerHandle* handler) {
-                    _eventListenersMutex.lock(); // Because we MIGHT be removing the Listeners collection, we need to exclusively lock the Mutex
-                    EventListeners* typeListeners = _eventListeners[eventType]; // Get the Listeners collection for this Event Type
-                    if (typeListeners == nullptr) {
-                        _eventListenersMutex.unlock();
+                void UnregisterListener(
+                    std::type_index eventType,
+                    IEventListenerHandle* handler) override {
+                    std::unique_lock<std::shared_mutex> lock(_eventListenersMutex);
+                    const auto listenersForType = _eventListeners.find(eventType);
+                    if (listenersForType == _eventListeners.end() ||
+                        listenersForType->second == nullptr) {
                         return;
                     }
+                    EventListeners* typeListeners = listenersForType->second;
+                    bool removed = false;
                     for (auto it = typeListeners->begin(); it != typeListeners->end(); it++) {
                         if ((*it)->GetListenerHandler() == handler) {
                             static_cast<EventListenerHandle*>(handler)->ForceUnregister(); // Forcibly Unregister the Handle
-                            delete *it; // Delete the Listener
                             typeListeners->erase(it);
+                            removed = true;
                             break;
                         }
                     }
-                    if (typeListeners->size() == 0) {
+                    const bool removedLastListener = removed && typeListeners->empty();
+                    if (removedLastListener) {
+                        delete typeListeners;
                         _eventListeners.erase(eventType);
-                        
                     }
-                    _eventListenersMutex.unlock();
-                    OnListenerUnregistered(eventType);
+                    lock.unlock();
+                    if (removedLastListener) {
+                        OnListenerUnregistered(eventType);
+                    }
                 }
 
                 template <typename EventType>
@@ -288,35 +386,29 @@ namespace ESPressio {
                 }
 
                 inline void ProcessEvent(IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                    _eventListenersMutex.lock_shared(); // Because we are only reading from the Listeners collection, we can use a Shared Lock
-                    EventListeners* typeListeners = _eventListeners[typeid(*event)]; // Get the Listeners collection for this Event Type
+                    class EventReferenceGuard {
+                        private:
+                            IEvent* _event;
+                        public:
+                            explicit EventReferenceGuard(IEvent* guardedEvent)
+                                : _event(guardedEvent) {}
+                            ~EventReferenceGuard() { _event->__unref(); }
+                    } eventReferenceGuard(event);
 
-                    if (typeListeners == nullptr) {
-                        event->__unref();
-                        _eventListenersMutex.unlock_shared();
-                        return;
+                    EventListeners listeners;
+                    {
+                        std::shared_lock<std::shared_mutex> lock(_eventListenersMutex);
+                        const auto listenersForType = _eventListeners.find(typeid(*event));
+                        if (listenersForType == _eventListeners.end() ||
+                            listenersForType->second == nullptr) {
+                            return;
+                        }
+                        listeners = *listenersForType->second;
                     }
 
-                    for (auto ilistener : *typeListeners) {
-                        EventListenerContainer<IEvent>* listener = static_cast<EventListenerContainer<IEvent>*>(ilistener);
-                        if (listener->GetInterest() == EventListenerInterest::All) { // If the interest is All...
-                            listener->GetCallback()(event, dispatchMethod, priority); // ...call the Listener's Callback
-                        }
-                        else if (listener->GetInterest() == EventListenerInterest::YoungerThan) { // If the interest is YoungerThan...
-                            if (event->GetTimeSinceDispatch() < listener->GetMaximumTimeSinceDispatch()) { // ...and the time since dispatch is less than the maximum time since dispatch...
-                                listener->GetCallback()(event, dispatchMethod, priority); // ...call the Listener's Callback
-                            }
-                        }
-                        else if (listener->GetInterest() == EventListenerInterest::Custom) { // If the interest is Custom...
-                            bool interested = listener->GetCustomInterestCallback()(event); // ...call the Listener's Custom Interest Callback
-                            if (interested) { // If the Listener is interested...
-                                listener->GetCallback()(event, dispatchMethod, priority); // ...call the Listener's Callback
-                            }
-                        }
+                    for (const std::shared_ptr<IEventListenerContainer>& listener : listeners) {
+                        listener->ProcessEvent(event, dispatchMethod, priority);
                     }
-
-                    event->__unref();
-                    _eventListenersMutex.unlock_shared();
                 }
         };
 

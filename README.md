@@ -39,11 +39,15 @@ The namespace provides the following (*click on any declaration to navigate to m
 - [`ESPressio::Event::Event`](#event)
 - [`ESPressio::Event::IEventThread`](#ieventthread)
 - [`ESPressio::Event::EventThread`](#eventthread)
+- `ESPressio::Event::IEventObserver<EventType>`
 
 ## Dependencies
-The ESPressio Event library has an internal dependency, which is the [`ESPressio Threads library`](http://github.com/Flowduino/ESPressio-Threads).
+The ESPressio Event library depends on:
 
-This library for Event-Driven Development (EDD) builds upon the Threading library directly, so please pay attention to include both libraries in your projects.
+* [`ESPressio Threads`](http://github.com/Flowduino/ESPressio-Threads) 1.3.0 or later for asynchronous Event processing.
+* [`ESPressio Observable`](https://github.com/Flowduino/ESPressio-Observable) 2.0.0 or later for its common `IObserver` contract and typed Event Observer support.
+
+PlatformIO resolves both dependencies from `library.json` automatically.
 
 ## Platformio.ini
 You can quickly and easily add this library to your project in PlatformIO by simply including the following in your `platformio.ini` file:
@@ -51,6 +55,7 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 ```ini
 lib_deps =
     flowduino/ESPressio-Thread@^1.3.0
+    flowduino/ESPressio-Observable@^2.0.0
     flowduino/ESPressio-Event@^1.0.0
 ```
 
@@ -59,6 +64,7 @@ Alternatively, if you want to use the bleeding-edge (effectively "Developer Inte
 ```ini
 lib_deps = 
     https://github.com/Flowduino/ESPressio-Threads.git
+    https://github.com/Flowduino/ESPressio-Observable.git
     https://github.com/Flowduino/ESPressio-Event.git
 ```
 Please note that this will use the very latest commits pushed into the repository, so volatility is possible.
@@ -172,6 +178,55 @@ When your `EventListener`'s parent `EventThread` then processes its internal `Ev
 You can invoke `RegisterListener` and `UnregisterListener` against any `EventListener` at any time. This means that you can, in effect, deactivate a specific `EventListener` when the execution state of your program would benefit from doing so, and no `Event` will be passed along to it.
 
 This is more efficient than managing a flag (e.g. a `bool`) and interrogating its state each time an `EventListener` is processing an `Event` to determine whether to process it or not.
+
+### Typed Event Observers
+
+Every callback-based Event listener can alternatively be expressed as an Observer. Define a class implementing `IEventObserver<EventType>` and register it through the same `EventListener` or `EventThread`:
+
+```cpp
+#include <ESPressio_EventObserver.hpp>
+#include <ESPressio_EventThread.hpp>
+
+class TemperatureObserver : public IEventObserver<TemperatureChangeEvent> {
+    public:
+        void OnEvent(
+            TemperatureChangeEvent* event,
+            EventDispatchMethod dispatchMethod,
+            EventPriority priority
+        ) override {
+            Serial.printf("Temperature changed to %d.", event->GetTemperature());
+        }
+};
+
+TemperatureObserver temperatureObserver;
+IEventListenerHandle* observerHandle =
+    eventThread.RegisterObserver<TemperatureChangeEvent>(&temperatureObserver);
+```
+
+`IEventObserver<EventType>` derives from ESPressio Observable 2.0's `IObserver` interface. The Event library adapts its virtual methods into the existing asynchronous listener pipeline, so callback listeners and Observers can coexist for the same Event type and receive identical Event, dispatch-method, and priority values.
+
+Observers are non-owning. An Observer must remain alive until its returned `IEventListenerHandle` has been unregistered or deleted. The handle remains owned by the caller, exactly as with `RegisterListener()`.
+
+The normal listener interest modes are supported:
+
+```cpp
+IEventListenerHandle* observerHandle =
+    eventThread.RegisterObserver<TemperatureChangeEvent>(
+        &temperatureObserver,
+        EventListenerInterest::YoungerThan,
+        100
+    );
+```
+
+For `EventListenerInterest::Custom`, override `IsInterestedInEvent()` instead of supplying a predicate callback:
+
+```cpp
+bool IsInterestedInEvent(TemperatureChangeEvent* event) override {
+    return event->GetTemperature() >= 30;
+}
+```
+
+An Observer can implement multiple `IEventObserver<EventType>` interfaces and register each one independently. Each registration has its own `IEventListenerHandle` and interest policy.
 
 ### `EventManager`
 The `EventManager` is a singular, central `Event` Dispatch Handler for all `Event` types in your implementation.
