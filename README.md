@@ -427,6 +427,14 @@ loop() {
 
 Simple, right?
 
+### Example Topology
+
+The topology below illustrates the deliberate absence of direct relationships between the example's application modules. `Thermometer` knows only how to dispatch a `TemperatureChangeEvent`; the `EventManager` independently routes that event to each interested `EventThread`. Neither `TemperatureSerialLogger` nor `TemperatureDisplay` holds a reference to—or otherwise depends upon—the other.
+
+[![Thermometer example decoupled event topology](diagrams/thermometer-example-topology.png)](diagrams/thermometer-example-topology.png)
+
+The editable vector source is available at [`diagrams/thermometer-example-topology.svg`](diagrams/thermometer-example-topology.svg).
+
 ### Conclusions:
 Did you notice something?
 
