@@ -348,6 +348,8 @@ class TemperatureSerialLogger : public EventThread {
             }
         );
     public:
+        TemperatureSerialLogger() : EventThread(false) { }
+
         ~TemperatureSerialLogger() {
             delete _temperatureChangeEventListener;
         }
@@ -386,6 +388,8 @@ class TemperatureDisplay : public EventThread {
             }
         );
     public:
+        TemperatureDisplay() : EventThread(false) { }
+
         ~TemperatureDisplay() {
             delete _temperatureChangeEventListener;
         }
@@ -437,25 +441,97 @@ Okay, the *modules* are all defined and implemented, so all that remains is to i
 ### `.ino` file or `main.cpp`
 Let's just dive right in here:
 ```cpp
+#include <Arduino.h>
+#include <unordered_map>
+
+#include <ESPressio_IThread.hpp>
+
 #include "TemperatureSerialLogger.hpp"
 #include "TemperatureDisplay.hpp"
 #include "Thermometer.hpp"
+
+using ESPressio::Threads::IThread;
+using ESPressio::Threads::ThreadInitializationStatus;
+using ESPressio::Event::EventThread;
 
 TemperatureSerialLogger temperatureSerialLogger;
 TemperatureDisplay temperatureDisplay;
 Thermometer thermometer;
 
-setup() {
-    Serial.begin(115200);
-    delay(500); // Small delay just to ensure the Serial monitor is ready
+bool eventThreadsReady = false;
+
+const std::unordered_map<ThreadInitializationStatus, String>
+    initializationStatusNames = {
+        {ThreadInitializationStatus::Success, "Success"},
+        {ThreadInitializationStatus::AlreadyInitialized, "AlreadyInitialized"},
+        {ThreadInitializationStatus::InvalidState, "InvalidState"},
+        {ThreadInitializationStatus::ExitSignalUnavailable, "ExitSignalUnavailable"},
+        {ThreadInitializationStatus::TerminationDispatcherUnavailable, "TerminationDispatcherUnavailable"},
+        {ThreadInitializationStatus::TerminationDispatchPending, "TerminationDispatchPending"},
+        {ThreadInitializationStatus::TaskCreationFailed, "TaskCreationFailed"},
+        {ThreadInitializationStatus::ConcurrentInitializationLost, "ConcurrentInitializationLost"},
+        {ThreadInitializationStatus::TerminatedDuringInitialization, "TerminatedDuringInitialization"},
+        {ThreadInitializationStatus::InitializationException, "InitializationException"}
+    };
+
+String GetInitializationStatusName(ThreadInitializationStatus status) {
+    auto statusName = initializationStatusNames.find(status);
+    return statusName != initializationStatusNames.end()
+        ? statusName->second
+        : String("Unknown");
 }
 
-loop() {
+bool InitializeEventThread(EventThread& thread, const char* threadName) {
+    thread.SetOnInitializationFailed(
+        [threadName](IThread*, ThreadInitializationStatus status) {
+            String statusName = GetInitializationStatusName(status);
+            Serial.printf(
+                "Failed to initialize %s: %s.\n",
+                threadName,
+                statusName.c_str()
+            );
+        }
+    );
+
+    return thread.Initialize() == ThreadInitializationStatus::Success;
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(500); // Small delay just to ensure the Serial monitor is ready
+
+    bool loggerReady = InitializeEventThread(
+        temperatureSerialLogger,
+        "TemperatureSerialLogger"
+    );
+    bool displayReady = InitializeEventThread(
+        temperatureDisplay,
+        "TemperatureDisplay"
+    );
+
+    eventThreadsReady = loggerReady && displayReady;
+    if (!eventThreadsReady) {
+        Serial.println(
+            "Event processing is disabled because initialization failed."
+        );
+    }
+}
+
+void loop() {
+    if (!eventThreadsReady) {
+        delay(1000);
+        return;
+    }
+
     thermometer.UpdateTemperature();
 }
 ```
 
-Simple, right?
+Both `EventThread` instances are explicitly constructed with `freeOnTerminate` set to `false` because they have static storage duration and must not be deleted by the thread lifecycle machinery.
+
+Before each thread is initialized, the example installs an `OnInitializationFailed` callback that reports the exact `ThreadInitializationStatus`. The return value from `Initialize()` is also checked directly: both threads are given an opportunity to initialize, but temperature events remain disabled unless both succeed. `EventThread` starts automatically after successful initialization because its inherited `StartOnInitialize` setting defaults to `true`.
+
+In a production application, each failure status could instead trigger a use-case-specific response—for example, retrying later, enabling a degraded operating mode, recording a diagnostic, or restarting the device.
 
 ### Example Topology
 
