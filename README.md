@@ -203,7 +203,19 @@ class TemperatureObserver : public IEventObserver<TemperatureChangeEvent> {
             EventDispatchMethod dispatchMethod,
             EventPriority priority
         ) override {
-            Serial.printf("Temperature changed to %d.", event->GetTemperature());
+            int temperatureChange =
+                event->GetNewTemperature() - event->GetPreviousTemperature();
+            const char* direction = temperatureChange > 0 ? "UP" : "DOWN";
+            int degreesChanged =
+                temperatureChange > 0 ? temperatureChange : -temperatureChange;
+
+            Serial.printf(
+                "Temperature is %s by %d degrees (from %d to %d).",
+                direction,
+                degreesChanged,
+                event->GetPreviousTemperature(),
+                event->GetNewTemperature()
+            );
         }
 };
 
@@ -231,7 +243,7 @@ For `EventListenerInterest::Custom`, override `IsInterestedInEvent()` instead of
 
 ```cpp
 bool IsInterestedInEvent(TemperatureChangeEvent* event) override {
-    return event->GetTemperature() >= 30;
+    return event->GetNewTemperature() >= 30;
 }
 ```
 
@@ -279,11 +291,15 @@ using namespace ESPressio::Event;
 
 class TemperatureChangeEvent : public Event {
     private:
-        int _temperature;
+        int _previousTemperature;
+        int _newTemperature;
     public:
-        TemperatureChangeEvent(int temperature) : _temperature(temperature) { }
+        TemperatureChangeEvent(int previousTemperature, int newTemperature)
+            : _previousTemperature(previousTemperature),
+              _newTemperature(newTemperature) { }
 
-        int GetTemperature() { return _temperature; }
+        int GetPreviousTemperature() const { return _previousTemperature; }
+        int GetNewTemperature() const { return _newTemperature; }
 };
 ```
 The above shows how easy it is to define an `Event` type.
@@ -291,7 +307,7 @@ The above shows how easy it is to define an `Event` type.
 There are a few things to note here:
 * We need to include `ESPressio_Event.hpp` as this contains the `Event` base class.
 * We need to ensure we're using the `namespace` `ESPressio::Event` because the `Event` class is a member of this namespace.
-* Note that the only way to set the `_temperature` value is via the `constructor`, and we do *not* provide a `SetTemperature` method. This is to ensure idemopotence, which is critical for `Event` types.
+* Both the previous and new temperatures are supplied through the `constructor`, and no setters are provided. This preserves the event's idempotence while allowing listeners to understand the complete temperature transition.
 
 With the `Event` type now defined, it is possible to concurrently implement both the module of code taking temperature readings from the sensor, as well as the module that will display temperature changes in the Serial monitor *and* the module that will display temperature information on your device's physical display.
 
@@ -316,7 +332,19 @@ class TemperatureSerialLogger : public EventThread {
     private:
         IEventListenerHandle* _temperatureChangeEventListener = RegisterListener<TemperatureChangeEvent>(
             [&](TemperatureChangeEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                Serial.printf("Temperature changed to %d.", event->GetTemperature());
+                int temperatureChange =
+                    event->GetNewTemperature() - event->GetPreviousTemperature();
+                const char* direction = temperatureChange > 0 ? "UP" : "DOWN";
+                int degreesChanged =
+                    temperatureChange > 0 ? temperatureChange : -temperatureChange;
+
+                Serial.printf(
+                    "Temperature is %s by %d degrees (from %d to %d).",
+                    direction,
+                    degreesChanged,
+                    event->GetPreviousTemperature(),
+                    event->GetNewTemperature()
+                );
             }
         );
     public:
@@ -325,7 +353,7 @@ class TemperatureSerialLogger : public EventThread {
         }
 };
 ```
-The above shows how trivial it can be to implement an `EventThread` and define an `EventListener` for our `TemperatureChangeEvent` `Event` type.
+The above shows how trivial it can be to implement an `EventThread` and define an `EventListener` for our `TemperatureChangeEvent` `Event` type. Because the event carries both readings, the listener can determine whether the temperature moved `UP` or `DOWN` and calculate the magnitude of the change without retaining any temperature state of its own.
 
 Again, there are a few things to note here:
 * We need to include `ESPressio_EventThread.hpp` to access the `EventThread` base class.
@@ -354,7 +382,7 @@ class TemperatureDisplay : public EventThread {
     private:
         IEventListenerHandle* _temperatureChangeEventListener = RegisterListener<TemperatureChangeEvent>(
             [&](TemperatureChangeEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                // Code here to render the value of `event->GetTemperature()` on the phsyical display unit for this hardware device.
+                // Code here to render the value of `event->GetNewTemperature()` on the physical display unit for this hardware device.
             }
         );
     public:
@@ -386,9 +414,10 @@ class Thermometer {
 
             // If we made it here, the temperature has changed.
 
+            int previousTemperature = _temperature;
             _temperature = temperature; // Update the stored temperature to compare next time
 
-            (new TemperatureChangeEvent(temperature))->Queue(); // Dispatch our `TemperatureChangeEvent`
+            (new TemperatureChangeEvent(previousTemperature, temperature))->Queue(); // Dispatch our `TemperatureChangeEvent`
         }
 }
 ```
@@ -398,8 +427,9 @@ This is the most simplistic example possible, but we want to illustrate the poin
 
 A couple of things to note:
 * We've ommitted code from this example that would be specific to any one sensor unit, since there are a vast number of them with different methods to read their data.
-* The only real line of significance is `(new TemperatureChangeEvent(temperature))->Queue();`.
-* The above line not only instanciates a `TemperatureChangeEvent`, it dispatches it through the `Queue` with a `Normal` priority (where no parameter values are given, the `Normal` priority `Queue` or `Stack` will be used).
+* The previous temperature is captured before `_temperature` is updated, allowing the event to describe the complete transition.
+* The only real line of significance is `(new TemperatureChangeEvent(previousTemperature, temperature))->Queue();`.
+* The above line not only instantiates a `TemperatureChangeEvent` with both temperature values, it dispatches it through the `Queue` with a `Normal` priority (where no parameter values are given, the `Normal` priority `Queue` or `Stack` will be used).
 * This example dispatches the `Event` instance via a `Queue` (first in, first out), but you can substitute `Queue()` for `Stack()` to dispatch the `Event` instance via a `Stack` (last in, first out) instead.
 
 Okay, the *modules* are all defined and implemented, so all that remains is to implement our `.ino` or `main.cpp` file (depending on what IDE you're using for your development work)

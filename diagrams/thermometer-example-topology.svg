@@ -42,7 +42,7 @@
   <rect x="585" y="255" width="390" height="160" class="box event"/>
   <text x="780" y="297" class="kind">«event contract»</text>
   <text x="780" y="340" class="name">TemperatureChangeEvent</text>
-  <text x="780" y="378" class="detail">immutable temperature payload</text>
+  <text x="780" y="378" class="detail">immutable previous + new temperature payload</text>
 
   <rect x="1115" y="255" width="340" height="160" class="box manager"/>
   <text x="1285" y="297" class="kind">«library singleton»</text>
