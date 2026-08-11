@@ -50,7 +50,7 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Thread@^1.0.0
+    flowduino/ESPressio-Thread@^1.3.0
     flowduino/ESPressio-Event@^1.0.0
 ```
 
