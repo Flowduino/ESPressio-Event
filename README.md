@@ -133,6 +133,15 @@ With that said, it is important to understand that no single design pattern is c
 
 ## Understanding the Components of *ESPressio Event*
 Before we begin looking at code samples, it's useful to understand the Components of this Library... what they are and what they do.
+
+### Complete Type Topology
+
+The diagram below shows every class, interface, nested implementation type, and enumeration declared by ESPressio Event, together with its inheritance, ownership, and principal usage relationships. External base types from ESPressio Threads and ESPressio Observable are shown in grey.
+
+[![ESPressio Event complete type topology](diagrams/espressio-event-type-topology.png)](diagrams/espressio-event-type-topology.png)
+
+The editable vector source is available at [`diagrams/espressio-event-type-topology.svg`](diagrams/espressio-event-type-topology.svg).
+
 ### `Event`
 An `Event` is simply an object containing information.
 

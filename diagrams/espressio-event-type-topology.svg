@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="2400" viewBox="0 0 2400 1680" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #172033; }
+      .title { font-size: 40px; font-weight: 700; }
+      .subtitle { font-size: 19px; fill: #536078; }
+      .cluster { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
+      .cluster-title { font-size: 22px; font-weight: 700; fill: #334155; }
+      .box { stroke-width: 2.5; rx: 12; }
+      .interface { fill: #e0f2fe; stroke: #0284c7; }
+      .class { fill: #dcfce7; stroke: #16a34a; }
+      .abstract { fill: #cffafe; stroke: #0891b2; }
+      .template { fill: #f3e8ff; stroke: #9333ea; }
+      .enum { fill: #fef3c7; stroke: #d97706; }
+      .external { fill: #e2e8f0; stroke: #64748b; }
+      .nested { fill: #fae8ff; stroke: #c026d3; }
+      .name { font-size: 20px; font-weight: 700; text-anchor: middle; }
+      .kind { font-size: 15px; font-style: italic; fill: #526176; text-anchor: middle; }
+      .member { font-size: 15px; fill: #334155; text-anchor: middle; }
+      .inherit { fill: none; stroke: #334155; stroke-width: 3; marker-end: url(#triangle); }
+      .use { fill: none; stroke: #64748b; stroke-width: 2.5; stroke-dasharray: 9 7; marker-end: url(#arrow); }
+      .own { fill: none; stroke: #7c3aed; stroke-width: 2.5; marker-start: url(#diamond); marker-end: url(#arrow); }
+      .label-bg { fill: #fff; opacity: .92; }
+      .edge-label { font-size: 14px; fill: #475569; text-anchor: middle; }
+    </style>
+    <marker id="triangle" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="13" markerHeight="13" orient="auto-start-reverse">
+      <path d="M 1 1 L 11 6 L 1 11 z" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+    </marker>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#64748b" stroke-width="1.7"/>
+    </marker>
+    <marker id="diamond" viewBox="0 0 14 10" refX="1" refY="5" markerWidth="14" markerHeight="10" orient="auto">
+      <path d="M 1 5 L 6 1 L 11 5 L 6 9 z" fill="#fff" stroke="#7c3aed" stroke-width="1.5"/>
+    </marker>
+  </defs>
+
+  <rect width="2400" height="1680" fill="#ffffff"/>
+  <text x="70" y="65" class="title">ESPressio Event 2.1.0 — Complete Type Topology</text>
+  <text x="70" y="100" class="subtitle">Namespace: ESPressio::Event · solid hollow-arrow = inheritance · dashed arrow = dependency · diamond = ownership/containment</text>
+
+  <!-- clusters -->
+  <rect x="45" y="135" width="730" height="650" class="cluster"/>
+  <text x="70" y="175" class="cluster-title">Core event and dispatch pipeline</text>
+  <rect x="800" y="135" width="890" height="995" class="cluster"/>
+  <text x="825" y="175" class="cluster-title">Listener and Observer subsystem</text>
+  <rect x="45" y="815" width="730" height="760" class="cluster"/>
+  <text x="70" y="855" class="cluster-title">Thread execution types</text>
+  <rect x="1715" y="135" width="640" height="995" class="cluster"/>
+  <text x="1740" y="175" class="cluster-title">Enumerations and external dependencies</text>
+
+  <!-- core nodes -->
+  <g><rect x="90" y="210" width="270" height="90" class="box interface"/><text x="225" y="242" class="kind">«interface»</text><text x="225" y="274" class="name">IEvent</text></g>
+  <g><rect x="90" y="375" width="270" height="105" class="box class"/><text x="225" y="407" class="kind">«class»</text><text x="225" y="439" class="name">Event</text><text x="225" y="466" class="member">reference-counted dispatch object</text></g>
+  <path d="M225 375 L225 300" class="inherit"/>
+
+  <g><rect x="455" y="210" width="270" height="90" class="box interface"/><text x="590" y="242" class="kind">«interface»</text><text x="590" y="274" class="name">IEventReceiver</text></g>
+  <g><rect x="455" y="375" width="270" height="105" class="box class"/><text x="590" y="407" class="kind">«class»</text><text x="590" y="439" class="name">EventReceiver</text><text x="590" y="466" class="member">priority queues and stacks</text></g>
+  <path d="M590 375 L590 300" class="inherit"/>
+
+  <g><rect x="90" y="595" width="270" height="90" class="box interface"/><text x="225" y="627" class="kind">«interface»</text><text x="225" y="659" class="name">IEventDispatcher</text></g>
+  <g><rect x="455" y="570" width="270" height="115" class="box class"/><text x="590" y="602" class="kind">«class»</text><text x="590" y="634" class="name">EventDispatcher</text><text x="590" y="661" class="member">type-indexed receiver buckets</text></g>
+  <path d="M455 627 L360 640" class="inherit"/>
+  <path d="M590 570 L590 480" class="inherit"/>
+  <path d="M455 448 C400 448 400 255 360 255" class="use"/>
+  <rect x="364" y="334" width="74" height="23" class="label-bg"/><text x="401" y="351" class="edge-label">stores IEvent*</text>
+
+  <!-- listener nodes -->
+  <g><rect x="850" y="210" width="270" height="90" class="box interface"/><text x="985" y="242" class="kind">«interface»</text><text x="985" y="274" class="name">IEventListenerHandle</text></g>
+  <g><rect x="850" y="375" width="270" height="105" class="box class"/><text x="985" y="407" class="kind">«class»</text><text x="985" y="439" class="name">EventListenerHandle</text><text x="985" y="466" class="member">RAII registration handle</text></g>
+  <path d="M985 375 L985 300" class="inherit"/>
+
+  <g><rect x="1190" y="210" width="270" height="90" class="box interface"/><text x="1325" y="242" class="kind">«interface»</text><text x="1325" y="274" class="name">IEventListener</text></g>
+  <g><rect x="1190" y="375" width="270" height="105" class="box class"/><text x="1325" y="407" class="kind">«class»</text><text x="1325" y="439" class="name">EventListener</text><text x="1325" y="466" class="member">typed callback/observer registry</text></g>
+  <path d="M1325 375 L1325 300" class="inherit"/>
+  <path d="M1120 427 L1190 427" class="use"/>
+  <rect x="1126" y="398" width="58" height="22" class="label-bg"/><text x="1155" y="414" class="edge-label">targets</text>
+
+  <g><rect x="850" y="595" width="270" height="100" class="box nested"/><text x="985" y="627" class="kind">«private nested interface»</text><text x="985" y="659" class="name">IEventListenerContainer</text><text x="985" y="684" class="member">EventListener::</text></g>
+  <g><rect x="1190" y="580" width="270" height="130" class="box nested"/><text x="1325" y="612" class="kind">«private nested template»</text><text x="1325" y="644" class="name">EventListenerContainer</text><text x="1325" y="673" class="member">&lt;EventType&gt;</text><text x="1325" y="697" class="member">EventListener::</text></g>
+  <path d="M1190 645 L1120 645" class="inherit"/>
+  <path d="M1325 480 L1325 580" class="own"/>
+  <rect x="1340" y="514" width="88" height="22" class="label-bg"/><text x="1384" y="530" class="edge-label">owns registry</text>
+
+  <g><rect x="850" y="835" width="270" height="110" class="box template"/><text x="985" y="867" class="kind">«template interface»</text><text x="985" y="899" class="name">IEventObserver</text><text x="985" y="929" class="member">&lt;EventType&gt;</text></g>
+  <path d="M1190 438 C1090 520 1040 730 985 835" class="use"/>
+  <rect x="1033" y="735" width="145" height="22" class="label-bg"/><text x="1105" y="751" class="edge-label">RegisterObserver()</text>
+  <path d="M1325 710 C1325 810 1165 890 1120 890" class="use"/>
+  <rect x="1213" y="811" width="103" height="22" class="label-bg"/><text x="1264" y="827" class="edge-label">adapts callback</text>
+
+  <g><rect x="1190" y="850" width="270" height="105" class="box nested"/><text x="1325" y="882" class="kind">«local nested class»</text><text x="1325" y="914" class="name">EventReferenceGuard</text><text x="1325" y="941" class="member">inside ProcessEvent()</text></g>
+  <path d="M1190 902 L1120 902" class="use"/>
+  <rect x="1129" y="875" width="52" height="22" class="label-bg"/><text x="1155" y="891" class="edge-label">guards</text>
+
+  <!-- thread nodes -->
+  <g><rect x="90" y="900" width="270" height="90" class="box interface"/><text x="225" y="932" class="kind">«marker interface»</text><text x="225" y="964" class="name">IEventThreadBase</text></g>
+  <g><rect x="455" y="900" width="270" height="90" class="box interface"/><text x="590" y="932" class="kind">«marker interface»</text><text x="590" y="964" class="name">IEventThread</text></g>
+  <g><rect x="90" y="1080" width="270" height="110" class="box abstract"/><text x="225" y="1112" class="kind">«abstract class»</text><text x="225" y="1144" class="name">EventThreadBase</text><text x="225" y="1172" class="member">event-driven suspended loop</text></g>
+  <path d="M225 1080 L225 990" class="inherit"/>
+  <path d="M90 1135 C45 1135 45 428 455 428" class="inherit"/>
+
+  <g><rect x="90" y="1325" width="270" height="110" class="box class"/><text x="225" y="1357" class="kind">«class»</text><text x="225" y="1389" class="name">EventThread</text><text x="225" y="1417" class="member">events-only worker thread</text></g>
+  <path d="M190 1325 L190 1190" class="inherit"/>
+  <path d="M260 1325 C390 1240 500 1080 565 990" class="inherit"/>
+  <path d="M360 1380 C740 1370 1080 610 1230 480" class="inherit"/>
+
+  <g><rect x="455" y="1325" width="270" height="110" class="box abstract"/><text x="590" y="1357" class="kind">«abstract class»</text><text x="590" y="1389" class="name">EventThreadWithLoop</text><text x="590" y="1417" class="member">events + custom loop worker</text></g>
+  <path d="M590 1325 L590 990" class="inherit"/>
+  <path d="M455 1385 C405 1360 330 1160 290 990" class="inherit"/>
+  <path d="M725 1360 C930 1260 1110 670 1260 480" class="inherit"/>
+  <path d="M725 1405 C800 1405 810 460 725 440" class="inherit"/>
+
+  <g><rect x="250" y="1480" width="320" height="90" class="box class"/><text x="410" y="1512" class="kind">«singleton class»</text><text x="410" y="1544" class="name">EventManager</text></g>
+  <path d="M410 1480 C470 1320 520 900 570 685" class="inherit"/>
+  <path d="M360 428 C245 500 245 1400 330 1480" class="use"/>
+  <rect x="205" y="742" width="119" height="22" class="label-bg"/><text x="264" y="758" class="edge-label">Queue()/Stack()</text>
+
+  <!-- external and enum nodes -->
+  <g><rect x="1760" y="210" width="250" height="95" class="box enum"/><text x="1885" y="242" class="kind">«enum»</text><text x="1885" y="274" class="name">EventPriority</text><text x="1885" y="296" class="member">Low · Normal · High</text></g>
+  <g><rect x="2055" y="210" width="250" height="95" class="box enum"/><text x="2180" y="242" class="kind">«enum»</text><text x="2180" y="274" class="name">EventDispatchMethod</text><text x="2180" y="296" class="member">Stack · Queue</text></g>
+  <g><rect x="1760" y="350" width="250" height="105" class="box enum"/><text x="1885" y="382" class="kind">«enum»</text><text x="1885" y="414" class="name">EventListenerInterest</text><text x="1885" y="442" class="member">All · YoungerThan · Custom</text></g>
+  <g><rect x="2055" y="350" width="250" height="105" class="box enum"/><text x="2180" y="382" class="kind">«enum»</text><text x="2180" y="414" class="name">EventThreadProcessOrder</text><text x="2180" y="442" class="member">EventsBeforeLoop · EventsAfterLoop</text></g>
+
+  <text x="1745" y="535" class="cluster-title">External ESPressio types</text>
+  <g><rect x="1760" y="575" width="250" height="90" class="box external"/><text x="1885" y="607" class="kind">ESPressio::Threads</text><text x="1885" y="639" class="name">Thread</text></g>
+  <g><rect x="2055" y="575" width="250" height="90" class="box external"/><text x="2180" y="607" class="kind">ESPressio::Observable</text><text x="2180" y="639" class="name">IObserver</text></g>
+  <g><rect x="1760" y="720" width="545" height="100" class="box external"/><text x="2032" y="752" class="kind">ESPressio::Threads</text><text x="2032" y="784" class="name">ReadWriteMutex&lt;T&gt; / Mutex&lt;T&gt;</text><text x="2032" y="808" class="member">thread-safe Event and handle state</text></g>
+
+  <!-- cross-cluster dependencies -->
+  <path d="M985 835 C1120 760 1600 650 2055 620" class="inherit"/>
+  <path d="M225 1080 C640 1030 1320 620 1760 620" class="inherit"/>
+  <path d="M590 1325 C930 1200 1420 760 1760 620" class="inherit"/>
+  <path d="M410 1480 C860 1450 1500 840 1760 640" class="inherit"/>
+  <path d="M360 425 C860 380 1380 720 1760 770" class="use"/>
+  <path d="M985 375 C1320 280 1570 590 1760 770" class="use"/>
+
+  <!-- enum usage -->
+  <path d="M455 412 C930 200 1450 250 1760 255" class="use"/>
+  <path d="M725 430 C1150 180 1620 250 2055 255" class="use"/>
+  <path d="M1325 375 C1510 350 1640 400 1760 402" class="use"/>
+  <path d="M725 1380 C1320 1320 1900 700 2180 455" class="use"/>
+
+  <!-- legend -->
+  <rect x="1715" y="1165" width="640" height="410" class="cluster"/>
+  <text x="1740" y="1205" class="cluster-title">Legend and scope</text>
+  <rect x="1750" y="1240" width="120" height="48" class="box interface"/><text x="1810" y="1270" class="member">interface</text>
+  <rect x="1890" y="1240" width="120" height="48" class="box class"/><text x="1950" y="1270" class="member">concrete</text>
+  <rect x="2030" y="1240" width="120" height="48" class="box abstract"/><text x="2090" y="1270" class="member">abstract</text>
+  <rect x="2170" y="1240" width="120" height="48" class="box enum"/><text x="2230" y="1270" class="member">enum</text>
+  <path d="M1770 1335 L1910 1335" class="inherit"/><text x="2040" y="1341" class="member">inherits / implements</text>
+  <path d="M1770 1390 L1910 1390" class="use"/><text x="2040" y="1396" class="member">uses / registers / dispatches</text>
+  <path d="M1770 1445 L1910 1445" class="own"/><text x="2040" y="1451" class="member">owns / contains</text>
+  <text x="1750" y="1510" class="subtitle">All named classes, interfaces, nested implementation</text>
+  <text x="1750" y="1538" class="subtitle">types, and enums declared by the library are shown.</text>
+</svg>
