@@ -134,11 +134,13 @@ int main() {
     IEventListenerHandle* observerHandle =
         listener.RegisterObserver<TestEvent>(&observer);
     assert(observerHandle->IsRegistered());
+    const int routingRegistrations = listener.registrations;
+    const int routingUnregistrations = listener.unregistrations;
 
     int callbackCalls = 0;
     IEventListenerHandle* callbackHandle = listener.RegisterListener<TestEvent>(
         [&](TestEvent*, EventDispatchMethod, EventPriority) { ++callbackCalls; });
-    assert(listener.registrations == 1);
+    assert(listener.registrations == routingRegistrations);
 
     TestEvent event;
     Process(listener, event, EventDispatchMethod::Stack, EventPriority::High);
@@ -155,10 +157,10 @@ int main() {
     Process(listener, event);
     assert(observer.calls == 1);
     assert(callbackCalls == 2);
-    assert(listener.unregistrations == 0);
+    assert(listener.unregistrations == routingUnregistrations);
     delete observerHandle;
     delete callbackHandle;
-    assert(listener.unregistrations == 1);
+    assert(listener.unregistrations == routingUnregistrations + 1);
 
     TestObserver customObserver;
     IEventListenerHandle* customHandle = listener.RegisterObserver<TestEvent>(
