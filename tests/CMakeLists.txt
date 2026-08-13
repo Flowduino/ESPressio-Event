@@ -9,6 +9,9 @@ target_include_directories(espressio_event_observer_tests PRIVATE
     stubs
     ../src
     ../../ESPressio-Observable/src
+    ../../ESPressio_Timing/src
+    ../../ESPressio-Units/src
+    ../../ESPressio_Timing/tests/stubs
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

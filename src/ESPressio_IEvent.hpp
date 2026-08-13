@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include <ESPressio_IClock.hpp>
 #include <ESPressio_ThreadSafe.hpp>
 
 #include "ESPressio_EventEnums.hpp"
@@ -13,6 +14,8 @@ using namespace ESPressio::Threads;
 namespace ESPressio {
 
     namespace Event {
+
+        using EventTime = Timing::ClockTime;
 
         class IEvent {
             public:
@@ -40,11 +43,11 @@ namespace ESPressio {
 
             // Getters
 
-                /// `GetDispatchTime` returns the time at which the Event was dispatched (in milliseconds)
-                virtual unsigned long GetDispatchTime() = 0;
+                /// Returns the System Clock time at which the Event was first dispatched.
+                virtual EventTime GetDispatchTime() = 0;
 
-                /// `GetTimeSinceDispatch` returns the time since the Event was dispatched (in milliseconds)
-                virtual unsigned long GetTimeSinceDispatch() = 0;
+                /// Returns the elapsed System Clock time since first dispatch.
+                virtual EventTime GetTimeSinceDispatch() = 0;
         };
 
     }

@@ -11,6 +11,7 @@
 
 #include <ESPressio_ThreadSafe.hpp>
 #include <ESPressio_IObservable.hpp>
+#include <ESPressio_Clock.hpp>
 
 #include "ESPressio_IEvent.hpp"
 #include "ESPressio_EventEnums.hpp"
@@ -44,7 +45,7 @@ namespace ESPressio {
                         EventPriority priority
                     )> callback,
                     EventListenerInterest interest = EventListenerInterest::All,
-                    unsigned long maximumTimeSinceDispatch = 0,
+                    EventTime maximumTimeSinceDispatch = EventTime(0),
                     std::function<bool(IEvent*)> customInterestCallback = nullptr
                 ) = 0;
 
@@ -55,7 +56,7 @@ namespace ESPressio {
                         EventDispatchMethod dispatchMethod,
                         EventPriority priority)> callback,
                         EventListenerInterest interest = EventListenerInterest::All,
-                        unsigned long maximumTimeSinceDispatch = 0,
+                        EventTime maximumTimeSinceDispatch = EventTime(0),
                         std::function<bool(IEvent*)> customInterestCallback = nullptr
                 );
 
@@ -65,7 +66,7 @@ namespace ESPressio {
                 IEventListenerHandle* RegisterObserver(
                     IEventObserver<EventType>* observer,
                     EventListenerInterest interest = EventListenerInterest::All,
-                    unsigned long maximumTimeSinceDispatch = 0
+                    EventTime maximumTimeSinceDispatch = EventTime(0)
                 ) {
                     if (observer == nullptr) {
                         throw Observable::InvalidObserverRegistrationException();
@@ -157,7 +158,7 @@ namespace ESPressio {
                         virtual IEventListenerHandle* GetListenerHandler() const = 0;
                         virtual IEventListener* GetRequester() const = 0;
                         virtual EventListenerInterest GetInterest() const = 0;
-                        virtual unsigned long GetMaximumTimeSinceDispatch() const = 0;
+                        virtual EventTime GetMaximumTimeSinceDispatch() const = 0;
                         virtual void ProcessEvent(
                             IEvent* event,
                             EventDispatchMethod dispatchMethod,
@@ -173,7 +174,7 @@ namespace ESPressio {
                         std::function<void(EventType*, EventDispatchMethod dispatchMethod, EventPriority priority)> _callback;
                         IEventListenerHandle* _listenerHandler;
                         EventListenerInterest _interest = EventListenerInterest::All; // Default to All
-                        unsigned long _maximumTimeSinceDispatch = 0; // Default to 0 because we only use this if the interest is YoungerThan
+                        EventTime _maximumTimeSinceDispatch;
                         std::function<bool(EventType*)> _customInterestCallback = nullptr; // Default to nullptr because we only use this Callback if the interest is Custom
                     public:
                     // Constructor
@@ -187,7 +188,7 @@ namespace ESPressio {
                             )> callback,
                             IEventListenerHandle* listenerHandler,
                             EventListenerInterest interest = EventListenerInterest::All,
-                            unsigned long maximumTimeSinceDispatch = 0,
+                            EventTime maximumTimeSinceDispatch = EventTime(0),
                             std::function<bool(EventType*)> customInterestCallback = nullptr
                         ) : _requester(requester), _callback(callback), _listenerHandler(listenerHandler), _interest(interest), _maximumTimeSinceDispatch(maximumTimeSinceDispatch), _customInterestCallback(customInterestCallback) { }
 
@@ -203,7 +204,7 @@ namespace ESPressio {
                         IEventListener* GetRequester() const override { return _requester; }
                         inline std::function<void(EventType*, EventDispatchMethod dispatchMethod, EventPriority priority)> GetCallback() const { return _callback; }
                         EventListenerInterest GetInterest() const override { return _interest; }
-                        unsigned long GetMaximumTimeSinceDispatch() const override { return _maximumTimeSinceDispatch; }
+                        EventTime GetMaximumTimeSinceDispatch() const override { return _maximumTimeSinceDispatch; }
                         std::function<bool(EventType*)> GetCustomInterestCallback() const { return _customInterestCallback; }
 
                         void ProcessEvent(
@@ -215,8 +216,11 @@ namespace ESPressio {
 
                             bool interested = _interest == EventListenerInterest::All;
                             if (_interest == EventListenerInterest::YoungerThan) {
-                                interested = event->GetTimeSinceDispatch() <
-                                    _maximumTimeSinceDispatch;
+                                interested = Timing::ClockBase::GetNanoseconds(
+                                    event->GetTimeSinceDispatch()
+                                ) < Timing::ClockBase::GetNanoseconds(
+                                    _maximumTimeSinceDispatch
+                                );
                             } else if (_interest == EventListenerInterest::Custom) {
                                 interested = _customInterestCallback != nullptr &&
                                     _customInterestCallback(typedEvent);
@@ -232,7 +236,7 @@ namespace ESPressio {
                         void SetRequester(IEventListener* requester) { _requester = requester; }
                         void SetCallback(std::function<void(EventType*, EventDispatchMethod dispatchMethod, EventPriority priority)> callback) { _callback = callback; }
                         void SetInterest(EventListenerInterest interest) { _interest = interest; }
-                        void SetMaximumTimeSinceDispatch(unsigned long maximumTimeSinceDispatch) { _maximumTimeSinceDispatch = maximumTimeSinceDispatch; }
+                        void SetMaximumTimeSinceDispatch(EventTime maximumTimeSinceDispatch) { _maximumTimeSinceDispatch = maximumTimeSinceDispatch; }
                         void SetCustomInterestCallback(std::function<bool(EventType*)> customInterestCallback) { _customInterestCallback = customInterestCallback; }
                 };
 
@@ -297,7 +301,7 @@ namespace ESPressio {
                         EventPriority priority
                     )> callback,
                     EventListenerInterest interest = EventListenerInterest::All,
-                    unsigned long maximumTimeSinceDispatch = 0,
+                    EventTime maximumTimeSinceDispatch = EventTime(0),
                     std::function<bool(IEvent*)> customInterestCallback = nullptr
 
                 ) override {
@@ -326,7 +330,7 @@ namespace ESPressio {
                         EventDispatchMethod dispatchMethod,
                         EventPriority priority)> callback,
                         EventListenerInterest interest = EventListenerInterest::All,
-                        unsigned long maximumTimeSinceDispatch = 0,
+                        EventTime maximumTimeSinceDispatch = EventTime(0),
                         std::function<bool(EventType*)> customInterestCallback = nullptr
 
                 ) {

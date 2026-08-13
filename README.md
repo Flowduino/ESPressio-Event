@@ -10,7 +10,7 @@ The latest Stable Version is [2.1.0](https://github.com/Flowduino/ESPressio-Even
 
 ESPressio Event currently targets the **ESP32 family** using the Arduino framework. This includes classic ESP32 and current single- and multi-core variants such as ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6, ESP32-H2, and ESP32-P4 when they are supported by the installed Arduino-ESP32 core.
 
-The ESP32 restriction comes from the required ESPressio Threads dependency and the library's direct use of ESP-IDF FreeRTOS semaphores. The build must also provide C++ RTTI, `std::shared_mutex`, Arduino `String`, and `millis()`. ESP8266, AVR, SAMD, RP2040, STM32, Renesas, and other non-ESP32 Arduino targets are not currently supported by the complete library.
+The ESP32 restriction comes from the required ESPressio Threads dependency and the library's direct use of ESP-IDF FreeRTOS semaphores. The build must also provide C++ RTTI, `std::shared_mutex`, and Arduino `String`. ESP8266, AVR, SAMD, RP2040, STM32, Renesas, and other non-ESP32 Arduino targets are not currently supported by the complete library.
 
 Compatibility is source-derived; each board/core/toolchain combination should still be verified by compiling for the intended target.
 
@@ -167,6 +167,24 @@ Additionally, every `EventListener` will process the same `Event` *on its own `E
 `Event`s are also **reference counted** once dispatched. This means that you should **not** retain a *reference* or *pointer* to an `Event` once it has been dispatched, because the `Event` will be automatically destroyed once all `EventListener`s have processed it.
 
 >Remember: `Event`s are *"fire and forget."*
+
+Event dispatch timestamps use ESPressio-Timing's shared `SystemClock` instead
+of Arduino `millis()`. `GetDispatchTime()` and `GetTimeSinceDispatch()` both
+return `EventTime`, an alias of `Timing::ClockTime`. The value therefore retains
+the highest precision available from the active System Clock source and can be
+converted to whichever unit best expresses the caller's requirement:
+
+```cpp
+EventTime age = event->GetTimeSinceDispatch();
+uint64_t ageMicroseconds =
+    age.ToMagnitude<uint64_t>(Units::Micro);
+```
+
+Before first dispatch, both values are zero. The first call to `Queue()` or
+`Stack()` records the dispatch time; redispatching the same Event does not
+replace it. Event age assumes that the shared System Clock is not rebased while
+dispatched Events remain in flight. Calling `SystemClock::SetTime()` during
+that interval can invalidate elapsed-time results.
 
 ### `EventThread`
 
@@ -396,9 +414,12 @@ IEventListenerHandle* observerHandle =
     eventThread.RegisterObserver<TemperatureChangeEvent>(
         &temperatureObserver,
         EventListenerInterest::YoungerThan,
-        100
+        EventTime(100, Units::Milli)
     );
 ```
+
+The `YoungerThan` threshold is also an `EventTime`, so listener and Observer
+age filters use the same typed, high-resolution time contract as the Event.
 
 For `EventListenerInterest::Custom`, override `IsInterestedInEvent()` instead of supplying a predicate callback:
 

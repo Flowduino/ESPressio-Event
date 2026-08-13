@@ -9,17 +9,18 @@ using namespace ESPressio::Event;
 class TestEvent final : public IEvent {
     private:
         int _references = 1;
-        unsigned long _age;
+        EventTime _age;
 
     public:
-        explicit TestEvent(unsigned long age = 0) : _age(age) {}
+        explicit TestEvent(unsigned long ageMilliseconds = 0)
+            : _age(ageMilliseconds, ESPressio::Units::Milli) {}
         void __ref() override { ++_references; }
         void __unref() override { --_references; }
         void __dispatch() override {}
         void Queue(EventPriority = EventPriority::Normal) override {}
         void Stack(EventPriority = EventPriority::Normal) override {}
-        unsigned long GetDispatchTime() override { return 0; }
-        unsigned long GetTimeSinceDispatch() override { return _age; }
+        EventTime GetDispatchTime() override { return EventTime(0); }
+        EventTime GetTimeSinceDispatch() override { return _age; }
         int References() const { return _references; }
 };
 
@@ -30,8 +31,8 @@ class OtherEvent final : public IEvent {
         void __dispatch() override {}
         void Queue(EventPriority = EventPriority::Normal) override {}
         void Stack(EventPriority = EventPriority::Normal) override {}
-        unsigned long GetDispatchTime() override { return 0; }
-        unsigned long GetTimeSinceDispatch() override { return 0; }
+        EventTime GetDispatchTime() override { return EventTime(0); }
+        EventTime GetTimeSinceDispatch() override { return EventTime(0); }
 };
 
 class TestObserver final : public IEventObserver<TestEvent> {
@@ -175,7 +176,10 @@ int main() {
 
     TestObserver youngObserver;
     IEventListenerHandle* youngHandle = listener.RegisterObserver<TestEvent>(
-        &youngObserver, EventListenerInterest::YoungerThan, 10);
+        &youngObserver,
+        EventListenerInterest::YoungerThan,
+        EventTime(10, ESPressio::Units::Milli)
+    );
     TestEvent youngEvent(9);
     TestEvent oldEvent(10);
     Process(listener, youngEvent);

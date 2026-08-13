@@ -13,7 +13,7 @@ namespace ESPressio {
                 EventDispatchMethod dispatchMethod,
                 EventPriority priority)> callback,
                 EventListenerInterest interest,
-                unsigned long maximumTimeSinceDispatch,
+                EventTime maximumTimeSinceDispatch,
                 std::function<bool(IEvent*)> customInterestCallback
         ) {
             return RegisterListener(typeid(EventType), callback, interest, maximumTimeSinceDispatch, customInterestCallback);

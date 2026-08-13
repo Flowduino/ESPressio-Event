@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include <ESPressio_Clock.hpp>
+#include <ESPressio_SystemClock.hpp>
 #include <ESPressio_ThreadSafe.hpp>
 
 #include "ESPressio_IEvent.hpp"
@@ -17,9 +19,21 @@ namespace ESPressio {
 
         class Event : public IEvent {
             private:
-                ReadWriteMutex<unsigned long> _dispatchTime = ReadWriteMutex<unsigned long>(0);
+                struct DispatchState {
+                    bool wasDispatched = false;
+                    EventTime dispatchTime;
+
+                    bool operator==(const DispatchState& other) const {
+                        return wasDispatched == other.wasDispatched &&
+                            dispatchTime.value == other.dispatchTime.value &&
+                            dispatchTime.orderOfMagnitude ==
+                                other.dispatchTime.orderOfMagnitude;
+                    }
+                };
+
+                ReadWriteMutex<DispatchState> _dispatchState =
+                    ReadWriteMutex<DispatchState>(DispatchState());
                 Mutex<uint32_t> _refCount = Mutex<uint32_t>(0);
-                bool _wasDispatched = false;
             public:
                 virtual ~Event() { }
 
@@ -39,13 +53,16 @@ namespace ESPressio {
                 }
 
                 inline void __dispatch() override {
-                    if (_wasDispatched) { return; }
-                    _wasDispatched = true;
-                    _dispatchTime.WithWriteLock([](unsigned long& dispatchTime) {
-                        if (dispatchTime == 0) {
-                            dispatchTime = millis();
+                    const EventTime now = Timing::SystemClock::
+                        GetInstance()->GetTime();
+                    _dispatchState.WithWriteLock(
+                        [&now](DispatchState& state) {
+                            if (!state.wasDispatched) {
+                                state.wasDispatched = true;
+                                state.dispatchTime = now;
+                            }
                         }
-                    });
+                    );
                 }
 
                 void Queue(EventPriority priority = EventPriority::Normal) override {
@@ -56,12 +73,38 @@ namespace ESPressio {
                     EventManager::GetInstance()->StackEvent(this, priority);
                 }
 
-                inline unsigned long GetDispatchTime() override {
-                    return _dispatchTime.Get();
+                inline EventTime GetDispatchTime() override {
+                    return _dispatchState.Get().dispatchTime;
                 }
 
-                inline unsigned long GetTimeSinceDispatch() override {
-                    return millis() - _dispatchTime.Get();
+                inline EventTime GetTimeSinceDispatch() override {
+                    const EventTime now = Timing::SystemClock::
+                        GetInstance()->GetTime();
+                    const DispatchState state = _dispatchState.Get();
+                    const uint64_t resolution = Timing::ClockBase::
+                        GetNanoseconds(
+                            Timing::SystemClock::GetInstance()->
+                                GetResolution()
+                        );
+
+                    if (!state.wasDispatched) {
+                        return Timing::ClockBase::CreateClockTime(
+                            0, resolution == 0 ? 1 : resolution
+                        );
+                    }
+
+                    const uint64_t currentNanoseconds =
+                        Timing::ClockBase::GetNanoseconds(now);
+                    const uint64_t dispatchNanoseconds =
+                        Timing::ClockBase::GetNanoseconds(
+                            state.dispatchTime
+                        );
+                    return Timing::ClockBase::CreateClockTime(
+                        currentNanoseconds >= dispatchNanoseconds
+                            ? currentNanoseconds - dispatchNanoseconds
+                            : 0,
+                        resolution == 0 ? 1 : resolution
+                    );
                 }
         };
 
