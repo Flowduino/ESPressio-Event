@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 Provides a foundation for designing, structuring, and implementing your embedded programs using Event Pattern (Event-Driven Development or "EDD").
 
 ## Latest Stable Version
-The latest Stable Version is [3.0.3](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.0.3).
+The latest Stable Version is [3.1.0](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.1.0).
 
 ## Compatibility
 
@@ -50,6 +50,8 @@ The namespace provides the following (*click on any declaration to navigate to m
 - [`ESPressio::Event::PrecisionEventThread`](#precisioneventthread)
 - `ESPressio::Event::PrecisionEventProcessOrder`
 - `ESPressio::Event::PrecisionEventArrivalPolicy`
+- `ESPressio::Event::EventQueueOverflowPolicy`
+- `ESPressio::Event::EventCollectionCapacityPolicy`
 - `ESPressio::Event::IEventObserver<EventType>`
 
 ## Dependencies
@@ -67,7 +69,7 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 lib_deps =
     flowduino/ESPressio-Threads@^1.4.1
     flowduino/ESPressio-Observable@^2.0.0
-    flowduino/ESPressio-Event@^3.0.3
+    flowduino/ESPressio-Event@^3.1.0
 ```
 
 Alternatively, if you want to use the bleeding-edge (effectively "Developer Integration Testing" or "DIT") sources, you can instead use:
@@ -172,7 +174,67 @@ automatically, including when a listener throws or processing is otherwise
 aborted. Listener callbacks must not call the internal `__ref()` or
 `__unref()` operations.
 
+Event-capable Threads stop accepting Events, unregister their routing, and
+release pending Events when they terminate or when a callback or iteration
+throws. A failed Thread therefore cannot remain registered while accumulating
+an unbounded backlog.
+
 >Remember: `Event`s are *"fire and forget."*
+
+#### Pending Event Bounds
+
+Every `EventReceiver`, including `EventThread` and `PrecisionEventThread`, can
+place a bound on its combined pending Queue and Stack population:
+
+```cpp
+thread.SetMaximumPendingEventCount(32);
+thread.SetEventQueueOverflowPolicy(
+    Event::EventQueueOverflowPolicy::BlockProducer
+);
+```
+
+A maximum of zero is unbounded and preserves the historical behaviour. When a
+positive maximum is reached, `EventQueueOverflowPolicy` selects the response:
+
+- `BlockProducer` waits for the receiver to free capacity and is the default.
+- `RejectIncoming` releases the incoming Event for this receiver without
+  disturbing pending Events.
+- `DropOldest` releases the oldest pending Event and accepts the incoming one.
+- `DropLowestPriority` releases a pending Event from the lowest populated
+  priority and accepts the incoming one.
+
+Normal central dispatch uses a separate Event Manager task, allowing a blocked
+destination to resume when its Event Thread drains work. Code must not directly
+call `QueueEvent()` or `StackEvent()` against its own full receiver while using
+`BlockProducer`, because the receiver would be waiting on itself to make room.
+
+Queue diagnostics are available through `GetPendingEventCount()`,
+`GetPeakPendingEventCount()`, `GetRejectedEventCount()`, and
+`GetDroppedEventCount()`. `ResetEventQueueStatistics()` resets peak, rejected,
+and dropped measurements without altering pending Events.
+
+#### Event Collection Capacity
+
+Drained vectors use a separately configurable heap-capacity policy:
+
+- `EventCollectionCapacityPolicy::Retain` retains peak capacity to minimise
+  allocation activity.
+- `ShrinkWhenUnderutilized` is the default. It observes the most recent 16
+  drains and shrinks capacity when it exceeds the recent peak by the configured
+  excess factor.
+- `ReleaseAfterDrain` releases unused capacity after each drain, minimising
+  retained heap at the cost of more allocations.
+
+```cpp
+thread.SetEventCollectionCapacityPolicy(
+    Event::EventCollectionCapacityPolicy::ShrinkWhenUnderutilized
+);
+thread.SetMinimumRetainedEventCapacity(4);
+thread.SetEventCapacityExcessFactor(2);
+```
+
+`GetRetainedEventCapacity()` reports the combined retained element capacity of
+the receiver's Queue and Stack vectors.
 
 Event dispatch timestamps use ESPressio-Timing's shared `SystemClock` instead
 of Arduino `millis()`. `GetDispatchTime()` and `GetTimeSinceDispatch()` both

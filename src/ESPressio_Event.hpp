@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 
 #include <ESPressio_Clock.hpp>
@@ -33,23 +34,20 @@ namespace ESPressio {
 
                 ReadWriteMutex<DispatchState> _dispatchState =
                     ReadWriteMutex<DispatchState>(DispatchState());
-                Mutex<uint32_t> _refCount = Mutex<uint32_t>(0);
+                std::atomic<uint32_t> _refCount{0};
             public:
                 virtual ~Event() { }
 
-                inline void __ref() override {
-                    _refCount.WithWriteLock([](uint32_t& refCount) {
-                        refCount++;
-                    });
+                inline void __ref() noexcept override {
+                    _refCount.fetch_add(1, std::memory_order_relaxed);
                 }
 
-                inline void __unref() override {
-                    uint32_t cnt = 99;
-                    _refCount.WithWriteLock([&cnt](uint32_t& refCount) {
-                        refCount--;
-                        cnt = refCount;
-                    });
-                    if (cnt == 0) { delete this; }
+                inline void __unref() noexcept override {
+                    if (_refCount.fetch_sub(
+                        1, std::memory_order_acq_rel
+                    ) == 1) {
+                        delete this;
+                    }
                 }
 
                 inline void __dispatch() override {

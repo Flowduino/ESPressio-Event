@@ -19,15 +19,16 @@ namespace ESPressio {
 
         class IEvent {
             public:
+                virtual ~IEvent() = default;
             // Engine Methods
 
                 /// `__ref` increases the Reference Count for an `IEvent` object.
                 /// You should not call this method in your code under normal circumstances.
-                virtual void __ref() = 0; /// Not intended for client use!
+                virtual void __ref() noexcept = 0; /// Not intended for client use!
 
                 /// `__unref` decreases the Reference Count for an `IEvent` object.
                 /// You should not call this method in your code under normal circumstances.
-                virtual void __unref() = 0; /// Not intended for client use!
+                virtual void __unref() noexcept = 0; /// Not intended for client use!
 
                 /// `__dispatch` is called by the Event Engine to record necessary point-of-dispatch information
                 /// Do not call this in your own code.

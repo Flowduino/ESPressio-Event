@@ -14,8 +14,8 @@ class TestEvent final : public IEvent {
     public:
         explicit TestEvent(unsigned long ageMilliseconds = 0)
             : _age(ageMilliseconds, ESPressio::Units::Milli) {}
-        void __ref() override { ++_references; }
-        void __unref() override { --_references; }
+        void __ref() noexcept override { ++_references; }
+        void __unref() noexcept override { --_references; }
         void __dispatch() override {}
         void Queue(EventPriority = EventPriority::Normal) override {}
         void Stack(EventPriority = EventPriority::Normal) override {}
@@ -26,8 +26,8 @@ class TestEvent final : public IEvent {
 
 class OtherEvent final : public IEvent {
     public:
-        void __ref() override {}
-        void __unref() override {}
+        void __ref() noexcept override {}
+        void __unref() noexcept override {}
         void __dispatch() override {}
         void Queue(EventPriority = EventPriority::Normal) override {}
         void Stack(EventPriority = EventPriority::Normal) override {}

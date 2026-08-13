@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <typeindex>
 
@@ -37,6 +39,42 @@ namespace ESPressio {
                     PrecisionEventProcessOrder::EventsBeforeIteration;
                 PrecisionEventArrivalPolicy _eventArrivalPolicy =
                     PrecisionEventArrivalPolicy::ProcessOnNextIteration;
+                std::atomic<bool> _acceptingEvents{true};
+
+                class LifecycleObserver final :
+                    public Threads::IThreadObserver {
+                    private:
+                        PrecisionEventThread* _owner;
+                    public:
+                        explicit LifecycleObserver(
+                            PrecisionEventThread* owner
+                        ) : _owner(owner) { }
+
+                        void OnThreadExecutionFailed(
+                            Threads::IThread*, std::exception_ptr
+                        ) override {
+                            _owner->_stopReceivingEvents();
+                        }
+
+                        void OnThreadTerminated(
+                            Threads::IThread*
+                        ) override {
+                            _owner->_stopReceivingEvents();
+                        }
+                } _lifecycleObserver{this};
+                std::unique_ptr<Observable::IObserverHandle>
+                    _lifecycleObserverHandle;
+
+                void _stopReceivingEvents() noexcept {
+                    if (!_acceptingEvents.exchange(false)) {
+                        return;
+                    }
+                    StopAcceptingEvents();
+                    try {
+                        UnregisterAllListeners();
+                    } catch (...) { }
+                    ClearPendingEvents();
+                }
 
                 void _processPendingEvents() {
                     WithEvents([&](
@@ -54,24 +92,29 @@ namespace ESPressio {
                     IterationTime startTime,
                     Threads::SkippedIterationCount skippedIterations
                 ) final override {
-                    PrecisionEventProcessOrder processOrder;
-                    {
-                        std::lock_guard<std::mutex> lock(
-                            _eventPolicyMutex
-                        );
-                        processOrder = _eventProcessOrder;
-                    }
+                    try {
+                        PrecisionEventProcessOrder processOrder;
+                        {
+                            std::lock_guard<std::mutex> lock(
+                                _eventPolicyMutex
+                            );
+                            processOrder = _eventProcessOrder;
+                        }
 
-                    if (processOrder ==
-                        PrecisionEventProcessOrder::EventsBeforeIteration) {
-                        _processPendingEvents();
-                    }
+                        if (processOrder == PrecisionEventProcessOrder::
+                            EventsBeforeIteration) {
+                            _processPendingEvents();
+                        }
 
-                    OnIteration(delta, startTime, skippedIterations);
+                        OnIteration(delta, startTime, skippedIterations);
 
-                    if (processOrder ==
-                        PrecisionEventProcessOrder::EventsAfterIteration) {
-                        _processPendingEvents();
+                        if (processOrder == PrecisionEventProcessOrder::
+                            EventsAfterIteration) {
+                            _processPendingEvents();
+                        }
+                    } catch (...) {
+                        _stopReceivingEvents();
+                        throw;
                     }
                 }
 
@@ -82,7 +125,12 @@ namespace ESPressio {
                 ) = 0;
 
                 void OnWorkWake() final override {
-                    _processPendingEvents();
+                    try {
+                        _processPendingEvents();
+                    } catch (...) {
+                        _stopReceivingEvents();
+                        throw;
+                    }
                 }
 
                 void EventAdded() override {
@@ -122,16 +170,27 @@ namespace ESPressio {
             public:
                 explicit PrecisionEventThread(
                     Timing::ISystemClock* clock = nullptr
-                ) : Threads::PrecisionThread(clock) { }
+                ) : Threads::PrecisionThread(clock),
+                    _lifecycleObserverHandle(
+                        RegisterThreadObserver(&_lifecycleObserver)
+                    ) { }
 
                 PrecisionEventThread(
                     bool freeOnTerminate,
                     Timing::ISystemClock* clock = nullptr
-                ) : Threads::PrecisionThread(freeOnTerminate, clock) { }
+                ) : Threads::PrecisionThread(freeOnTerminate, clock),
+                    _lifecycleObserverHandle(
+                        RegisterThreadObserver(&_lifecycleObserver)
+                    ) { }
 
                 ~PrecisionEventThread() override {
                     Shutdown();
-                    UnregisterAllListeners();
+                    _stopReceivingEvents();
+                }
+
+                void Terminate() override {
+                    _stopReceivingEvents();
+                    Threads::PrecisionThread::Terminate();
                 }
 
                 PrecisionEventProcessOrder GetEventProcessOrder() const {

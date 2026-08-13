@@ -1,5 +1,7 @@
 #include <cassert>
+#include <atomic>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 #include "ESPressio_EventDispatcher.hpp"
@@ -11,8 +13,8 @@ class ReferenceTrackingEvent final : public IEvent {
         int _references = 0;
 
     public:
-        void __ref() override { ++_references; }
-        void __unref() override {
+        void __ref() noexcept override { ++_references; }
+        void __unref() noexcept override {
             assert(_references > 0);
             --_references;
         }
@@ -72,8 +74,8 @@ class HeapTrackingEvent final : public IEvent {
 
         ~HeapTrackingEvent() { --_liveEvents; }
 
-        void __ref() override { ++_references; }
-        void __unref() override {
+        void __ref() noexcept override { ++_references; }
+        void __unref() noexcept override {
             assert(_references > 0);
             if (--_references == 0) {
                 delete this;
@@ -183,4 +185,77 @@ int main() {
         stressReceiver.DrainWithoutRecording();
         assert(liveHeapEvents == 1);
     }
+
+    ReferenceTrackingEvent retainedEvent;
+    ReferenceTrackingEvent rejectedEvent;
+    TrackingReceiver boundedReceiver;
+    boundedReceiver.SetMaximumPendingEventCount(1);
+    boundedReceiver.SetEventQueueOverflowPolicy(
+        EventQueueOverflowPolicy::RejectIncoming
+    );
+    boundedReceiver.QueueEvent(&retainedEvent);
+    boundedReceiver.QueueEvent(&rejectedEvent);
+    assert(boundedReceiver.GetPendingEventCount() == 1);
+    assert(boundedReceiver.GetPeakPendingEventCount() == 1);
+    assert(boundedReceiver.GetRejectedEventCount() == 1);
+    assert(retainedEvent.References() == 1);
+    assert(rejectedEvent.References() == 0);
+    boundedReceiver.DrainWithoutRecording();
+    assert(retainedEvent.References() == 0);
+
+    ReferenceTrackingEvent oldestEvent;
+    ReferenceTrackingEvent replacementEvent;
+    boundedReceiver.SetEventQueueOverflowPolicy(
+        EventQueueOverflowPolicy::DropOldest
+    );
+    boundedReceiver.QueueEvent(&oldestEvent);
+    boundedReceiver.QueueEvent(&replacementEvent);
+    assert(oldestEvent.References() == 0);
+    assert(replacementEvent.References() == 1);
+    assert(boundedReceiver.GetDroppedEventCount() == 1);
+    boundedReceiver.DrainWithoutRecording();
+
+    ReferenceTrackingEvent lowPriorityEvent;
+    ReferenceTrackingEvent highPriorityEvent;
+    boundedReceiver.SetEventQueueOverflowPolicy(
+        EventQueueOverflowPolicy::DropLowestPriority
+    );
+    boundedReceiver.QueueEvent(&lowPriorityEvent, EventPriority::Low);
+    boundedReceiver.QueueEvent(&highPriorityEvent, EventPriority::High);
+    assert(lowPriorityEvent.References() == 0);
+    assert(highPriorityEvent.References() == 1);
+    boundedReceiver.DrainWithoutRecording();
+
+    ReferenceTrackingEvent blockingEvent;
+    ReferenceTrackingEvent waitingEvent;
+    boundedReceiver.SetEventQueueOverflowPolicy(
+        EventQueueOverflowPolicy::BlockProducer
+    );
+    boundedReceiver.QueueEvent(&blockingEvent);
+    std::atomic<bool> producerStarted{false};
+    std::atomic<bool> producerCompleted{false};
+    std::thread producer([&]() {
+        producerStarted.store(true);
+        boundedReceiver.QueueEvent(&waitingEvent);
+        producerCompleted.store(true);
+    });
+    while (!producerStarted.load()) {
+        std::this_thread::yield();
+    }
+    boundedReceiver.DrainWithoutRecording();
+    producer.join();
+    assert(producerCompleted.load());
+    assert(blockingEvent.References() == 0);
+    assert(waitingEvent.References() == 1);
+    boundedReceiver.DrainWithoutRecording();
+    assert(waitingEvent.References() == 0);
+
+    boundedReceiver.SetEventCollectionCapacityPolicy(
+        EventCollectionCapacityPolicy::ReleaseAfterDrain
+    );
+    ReferenceTrackingEvent capacityEvent;
+    boundedReceiver.QueueEvent(&capacityEvent);
+    boundedReceiver.DrainWithoutRecording();
+    assert(capacityEvent.References() == 0);
+    assert(boundedReceiver.GetRetainedEventCapacity() == 0);
 }

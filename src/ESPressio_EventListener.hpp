@@ -241,20 +241,23 @@ namespace ESPressio {
                 };
 
                 typedef std::vector<std::shared_ptr<IEventListenerContainer>> EventListeners;
-                typedef std::unordered_map<std::type_index, EventListeners*> EventListenersMap;
+                typedef std::shared_ptr<const EventListeners>
+                    EventListenersSnapshot;
+                typedef std::unordered_map<
+                    std::type_index, EventListenersSnapshot
+                > EventListenersMap;
 
                 /// This is a map of Event Types to a collection of Listeners for that Event Type
                 EventListenersMap _eventListeners;
                 std::shared_mutex _eventListenersMutex;
 
-                /// THE CALLER MUST LOCK AND UNLOCK THE MUTEX!
-                EventListeners* GetListenersForEventType(std::type_index eventType) {
-                    EventListeners* typeListeners = _eventListeners[eventType]; // Get the Listeners collection for this Event Type
-                    if (typeListeners == nullptr) { // If it doesn't exist...
-                        typeListeners = new EventListeners(); // ...let's create it...
-                        _eventListeners[eventType] = typeListeners; // ...and add it to the map
-                    }
-                    return typeListeners;
+                std::shared_ptr<EventListeners> CopyListenersForEventType(
+                    std::type_index eventType
+                ) {
+                    const auto found = _eventListeners.find(eventType);
+                    return found == _eventListeners.end() || !found->second
+                        ? std::make_shared<EventListeners>()
+                        : std::make_shared<EventListeners>(*found->second);
                 }
 
             protected:
@@ -267,24 +270,31 @@ namespace ESPressio {
                     (void)eventType;
                 }
 
-                void UnregisterAllListeners() {
-                    std::vector<std::type_index> eventTypes;
-                    {
+                void UnregisterAllListeners() noexcept {
+                    for (;;) {
+                        std::type_index eventType(typeid(void));
+                        bool found = false;
                         std::unique_lock<std::shared_mutex> lock(_eventListenersMutex);
-                        eventTypes.reserve(_eventListeners.size());
-                        for (auto& listenersForType : _eventListeners) {
-                            eventTypes.push_back(listenersForType.first);
-                            for (const auto& listener : *listenersForType.second) {
-                                static_cast<EventListenerHandle*>(
-                                    listener->GetListenerHandler())->ForceUnregister();
-                            }
-                            delete listenersForType.second;
+                        if (_eventListeners.empty()) {
+                            return;
                         }
-                        _eventListeners.clear();
-                    }
-
-                    for (const std::type_index& eventType : eventTypes) {
-                        OnListenerUnregistered(eventType);
+                        const auto listenersForType =
+                            _eventListeners.begin();
+                        eventType = listenersForType->first;
+                        found = true;
+                        for (const auto& listener :
+                            *listenersForType->second) {
+                            static_cast<EventListenerHandle*>(
+                                listener->GetListenerHandler()
+                            )->ForceUnregister();
+                        }
+                        _eventListeners.erase(listenersForType);
+                        lock.unlock();
+                        if (found) {
+                            try {
+                                OnListenerUnregistered(eventType);
+                            } catch (...) { }
+                        }
                     }
                 }
 
@@ -308,7 +318,8 @@ namespace ESPressio {
                     std::unique_ptr<EventListenerHandle> handler(
                         new EventListenerHandle(eventType, this));
                     std::unique_lock<std::shared_mutex> lock(_eventListenersMutex);
-                    EventListeners* typeListeners = GetListenersForEventType(eventType); // Get the Listeners collection for this Event Type (will create the Listeners collection if it doesn't exist)
+                    std::shared_ptr<EventListeners> typeListeners =
+                        CopyListenersForEventType(eventType);
                     const bool isFirstListener = typeListeners->empty();
 
                     std::shared_ptr<EventListenerContainer<IEvent>> listener =
@@ -317,6 +328,7 @@ namespace ESPressio {
                             maximumTimeSinceDispatch, customInterestCallback);
 
                     typeListeners->push_back(listener);
+                    _eventListeners[eventType] = typeListeners;
 
                     lock.unlock();
                     if (isFirstListener) { OnListenerRegistered(eventType); }
@@ -338,7 +350,8 @@ namespace ESPressio {
                     std::unique_ptr<EventListenerHandle> handler(
                         new EventListenerHandle(eventType, this));
                     std::unique_lock<std::shared_mutex> lock(_eventListenersMutex);
-                    EventListeners* typeListeners = GetListenersForEventType(eventType);
+                    std::shared_ptr<EventListeners> typeListeners =
+                        CopyListenersForEventType(eventType);
                     const bool isFirstListener = typeListeners->empty();
 
                     std::shared_ptr<EventListenerContainer<EventType>> listener =
@@ -347,6 +360,7 @@ namespace ESPressio {
                             maximumTimeSinceDispatch, customInterestCallback);
 
                     typeListeners->push_back(listener);
+                    _eventListeners[eventType] = typeListeners;
 
                     lock.unlock();
                     if (isFirstListener) { OnListenerRegistered(eventType); }
@@ -362,7 +376,10 @@ namespace ESPressio {
                         listenersForType->second == nullptr) {
                         return;
                     }
-                    EventListeners* typeListeners = listenersForType->second;
+                    std::shared_ptr<EventListeners> typeListeners =
+                        std::make_shared<EventListeners>(
+                            *listenersForType->second
+                        );
                     bool removed = false;
                     for (auto it = typeListeners->begin(); it != typeListeners->end(); it++) {
                         if ((*it)->GetListenerHandler() == handler) {
@@ -374,8 +391,9 @@ namespace ESPressio {
                     }
                     const bool removedLastListener = removed && typeListeners->empty();
                     if (removedLastListener) {
-                        delete typeListeners;
                         _eventListeners.erase(eventType);
+                    } else if (removed) {
+                        _eventListeners[eventType] = typeListeners;
                     }
                     lock.unlock();
                     if (removedLastListener) {
@@ -390,7 +408,7 @@ namespace ESPressio {
                 }
 
                 inline void ProcessEvent(IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                    EventListeners listeners;
+                    EventListenersSnapshot listeners;
                     {
                         std::shared_lock<std::shared_mutex> lock(_eventListenersMutex);
                         const auto listenersForType = _eventListeners.find(typeid(*event));
@@ -398,10 +416,10 @@ namespace ESPressio {
                             listenersForType->second == nullptr) {
                             return;
                         }
-                        listeners = *listenersForType->second;
+                        listeners = listenersForType->second;
                     }
 
-                    for (const std::shared_ptr<IEventListenerContainer>& listener : listeners) {
+                    for (const std::shared_ptr<IEventListenerContainer>& listener : *listeners) {
                         listener->ProcessEvent(event, dispatchMethod, priority);
                     }
                 }
