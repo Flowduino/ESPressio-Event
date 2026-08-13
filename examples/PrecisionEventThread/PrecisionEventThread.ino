@@ -52,7 +52,7 @@ void setup() {
         Event::PrecisionEventProcessOrder::EventsBeforeIteration
     );
     controlThread.SetEventArrivalPolicy(
-        Event::PrecisionEventArrivalPolicy::ProcessOnNextIteration
+        Event::PrecisionEventArrivalPolicy::ProcessImmediately
     );
 
     setpointListener = controlThread.RegisterListener<SetpointEvent>(

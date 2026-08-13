@@ -21,7 +21,8 @@ namespace ESPressio {
 
         enum class PrecisionEventArrivalPolicy : uint8_t {
             ProcessOnNextIteration,
-            TriggerImmediateIteration
+            TriggerImmediateIteration,
+            ProcessImmediately
         };
 
         class PrecisionEventThread :
@@ -80,6 +81,10 @@ namespace ESPressio {
                     Threads::SkippedIterationCount skippedIterations
                 ) = 0;
 
+                void OnWorkWake() final override {
+                    _processPendingEvents();
+                }
+
                 void EventAdded() override {
                     PrecisionEventArrivalPolicy arrivalPolicy;
                     {
@@ -92,6 +97,9 @@ namespace ESPressio {
                     if (arrivalPolicy == PrecisionEventArrivalPolicy::
                         TriggerImmediateIteration) {
                         Bump();
+                    } else if (arrivalPolicy == PrecisionEventArrivalPolicy::
+                        ProcessImmediately) {
+                        WakeForWork();
                     }
                 }
 

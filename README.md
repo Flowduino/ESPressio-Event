@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 Provides a foundation for designing, structuring, and implementing your embedded programs using Event Pattern (Event-Driven Development or "EDD").
 
 ## Latest Stable Version
-The latest Stable Version is [3.0.0](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.0.0).
+The latest Stable Version is [3.0.1](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.0.1).
 
 ## Compatibility
 
@@ -55,7 +55,7 @@ The namespace provides the following (*click on any declaration to navigate to m
 ## Dependencies
 The ESPressio Event library depends on:
 
-* [`ESPressio Threads`](https://github.com/Flowduino/ESPressio-Threads) 1.4.0 or later for asynchronous Event processing.
+* [`ESPressio Threads`](https://github.com/Flowduino/ESPressio-Threads) 1.4.1 or later for asynchronous Event processing.
 * [`ESPressio Observable`](https://github.com/Flowduino/ESPressio-Observable) 2.0.0 or later for its common `IObserver` contract and typed Event Observer support.
 
 PlatformIO resolves both dependencies from `library.json` automatically.
@@ -65,9 +65,9 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Threads@^1.4.0
+    flowduino/ESPressio-Threads@^1.4.1
     flowduino/ESPressio-Observable@^2.0.0
-    flowduino/ESPressio-Event@^3.0.0
+    flowduino/ESPressio-Event@^3.0.1
 ```
 
 Alternatively, if you want to use the bleeding-edge (effectively "Developer Integration Testing" or "DIT") sources, you can instead use:
@@ -261,10 +261,17 @@ the current schedule:
   an iteration immediately. That iteration reports zero skipped iterations
   unless scheduled deadlines were independently missed, and the regular
   cadence continues from the immediate iteration.
+- `PrecisionEventArrivalPolicy::ProcessImmediately` wakes the Thread and
+  processes pending Events on its own FreeRTOS task without invoking
+  `OnIteration()`. The scheduled iteration deadline, iteration measurements,
+  skipped-iteration count, and iteration Observer notifications are unaffected.
+  Multiple Events received before the Thread runs may be processed together in
+  one event-only pass.
 
 An Event arriving while the Thread is paused remains queued. Neither policy
 implicitly resumes a paused Thread; `Start()` processes the Event after the
-Thread resumes.
+Thread resumes. Here, "immediately" means asynchronously as soon as the owning
+task is scheduled; Event handlers are never moved onto the dispatching task.
 
 Each Event phase drains all currently pending stacks and queues in their normal
 priority and dispatch order. Event handlers therefore contribute to iteration
@@ -329,7 +336,7 @@ void setup() {
         Event::PrecisionEventProcessOrder::EventsBeforeIteration
     );
     controlThread.SetEventArrivalPolicy(
-        Event::PrecisionEventArrivalPolicy::ProcessOnNextIteration
+        Event::PrecisionEventArrivalPolicy::ProcessImmediately
     );
 
     setpointListener = controlThread.RegisterListener<SetpointEvent>(
