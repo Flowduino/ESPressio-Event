@@ -29,6 +29,8 @@ namespace ESPressio {
                 virtual bool IsRegistered() const = 0;
         };
 
+        using EventListenerHandlePtr = std::unique_ptr<IEventListenerHandle>;
+
         /*
             `IEventListener` is an Interface which you can implement to listen for Events.
             You can register a Listener for a specific Event Type and when that Event is Dispatched, your Listener will be called.
@@ -37,7 +39,7 @@ namespace ESPressio {
             public:
                 virtual ~IEventListener() { }
 
-                virtual IEventListenerHandle* RegisterListener(
+                virtual EventListenerHandlePtr RegisterListener(
                     std::type_index eventType,
                     std::function<void(
                         IEvent*,
@@ -50,7 +52,7 @@ namespace ESPressio {
                 ) = 0;
 
                 template <typename EventType>
-                IEventListenerHandle* RegisterListener(
+                EventListenerHandlePtr RegisterListener(
                     std::function<void(
                         IEvent*,
                         EventDispatchMethod dispatchMethod,
@@ -63,7 +65,7 @@ namespace ESPressio {
                 /// Registers a typed Observer using the same asynchronous Event
                 /// pipeline and lifetime handle as callback-based listeners.
                 template <typename EventType>
-                IEventListenerHandle* RegisterObserver(
+                EventListenerHandlePtr RegisterObserver(
                     IEventObserver<EventType>* observer,
                     EventListenerInterest interest = EventListenerInterest::All,
                     EventTime maximumTimeSinceDispatch = EventTime(0)
@@ -109,7 +111,8 @@ namespace ESPressio {
             `EventListenerHandle` is returned when invoking `RegisterListener` against any implementor of `IEventListener`.
             This class is used to manage the lifetime of the Listener and to unregister the Listener when it is no longer needed.
             You should retain your reference to this Handler and call `Unregister` against it when you are done with the Listener (and on your objects' Destructor if applicable).
-            DON'T FORGET: YOUR code takes ownership of the EventListenerHandle, and you must destroy (`delete`) it when you are done with it.
+            Registration returns an owning EventListenerHandlePtr. Retain it
+            while registered; destroying or resetting it unregisters safely.
         */
         class EventListenerHandle : public IEventListenerHandle {
             private:
@@ -124,8 +127,12 @@ namespace ESPressio {
                 template <typename EventType>
                 EventListenerHandle(IEventListener* listener) : _eventType(typeid(EventType)), _listener(listener) { }
                 
-                ~EventListenerHandle() override {
-                    Unregister();
+                ~EventListenerHandle() noexcept override {
+                    try {
+                        Unregister();
+                    } catch (...) {
+                        ForceUnregister();
+                    }
                 }
 
             // Methods
@@ -303,7 +310,7 @@ namespace ESPressio {
                     UnregisterAllListeners();
                 }
 
-                IEventListenerHandle* RegisterListener(
+                EventListenerHandlePtr RegisterListener(
                     std::type_index eventType,
                     std::function<void(
                         IEvent*,
@@ -332,11 +339,11 @@ namespace ESPressio {
 
                     lock.unlock();
                     if (isFirstListener) { OnListenerRegistered(eventType); }
-                    return handler.release();
+                    return EventListenerHandlePtr(handler.release());
                 }
 
                 template <typename EventType>
-                IEventListenerHandle* RegisterListener(
+                EventListenerHandlePtr RegisterListener(
                     std::function<void(
                         EventType*,
                         EventDispatchMethod dispatchMethod,
@@ -364,7 +371,7 @@ namespace ESPressio {
 
                     lock.unlock();
                     if (isFirstListener) { OnListenerRegistered(eventType); }
-                    return handler.release();
+                    return EventListenerHandlePtr(handler.release());
                 }
 
                 void UnregisterListener(

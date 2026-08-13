@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 Provides a foundation for designing, structuring, and implementing your embedded programs using Event Pattern (Event-Driven Development or "EDD").
 
 ## Latest Stable Version
-The latest Stable Version is [3.1.0](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.1.0).
+The latest Stable Version is [4.0.0](https://github.com/Flowduino/ESPressio-Event/releases/tag/4.0.0).
 
 ## Compatibility
 
@@ -42,6 +42,17 @@ Please see the [![License](https://img.shields.io/badge/License-Apache%202.0-blu
 ## Namespace
 Every type/variable/constant/etc. related to *ESPressio* Event are located within the `Event` sub-namespace of the `ESPressio` parent namespace.
 
+Event receiver queues are bounded to 64 pending events by default and block the
+producer until capacity becomes available. Define
+`ESPRESSIO_EVENT_DEFAULT_MAX_PENDING_EVENT_COUNT` before including the library
+to select another embedded-safe default, or explicitly set a receiver maximum
+to zero when an unbounded queue is genuinely required.
+
+The central `EventManager` is process-lifetime FreeRTOS infrastructure. Its
+task, semaphore, dispatcher, and per-event-type routing buckets intentionally
+remain allocated until device shutdown; this is fixed infrastructure rather
+than per-dispatch retained Event ownership.
+
 The namespace provides the following (*click on any declaration to navigate to more info*):
 - [`ESPressio::Event::IEvent`](#ievent)
 - [`ESPressio::Event::Event`](#event)
@@ -57,8 +68,8 @@ The namespace provides the following (*click on any declaration to navigate to m
 ## Dependencies
 The ESPressio Event library depends on:
 
-* [`ESPressio Threads`](https://github.com/Flowduino/ESPressio-Threads) 1.4.1 or later for asynchronous Event processing.
-* [`ESPressio Observable`](https://github.com/Flowduino/ESPressio-Observable) 2.0.0 or later for its common `IObserver` contract and typed Event Observer support.
+* [`ESPressio Threads`](https://github.com/Flowduino/ESPressio-Threads) 2.0.0 or later for asynchronous Event processing.
+* [`ESPressio Observable`](https://github.com/Flowduino/ESPressio-Observable) 3.0.0 or later for its common `IObserver` contract and typed Event Observer support.
 
 PlatformIO resolves both dependencies from `library.json` automatically.
 
@@ -67,9 +78,9 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Threads@^1.4.1
-    flowduino/ESPressio-Observable@^2.0.0
-    flowduino/ESPressio-Event@^3.1.0
+    flowduino/ESPressio-Threads@^2.0.0
+    flowduino/ESPressio-Observable@^3.0.0
+    flowduino/ESPressio-Event@^4.0.0
 ```
 
 Alternatively, if you want to use the bleeding-edge (effectively "Developer Integration Testing" or "DIT") sources, you can instead use:
@@ -193,8 +204,9 @@ thread.SetEventQueueOverflowPolicy(
 );
 ```
 
-A maximum of zero is unbounded and preserves the historical behaviour. When a
-positive maximum is reached, `EventQueueOverflowPolicy` selects the response:
+The default maximum is 64. A maximum of zero explicitly requests the historical
+unbounded behaviour. When a positive maximum is reached,
+`EventQueueOverflowPolicy` selects the response:
 
 - `BlockProducer` waits for the receiver to free capacity and is the default.
 - `RejectIncoming` releases the incoming Event for this receiver without
@@ -392,7 +404,7 @@ class ControlThread final : public Event::PrecisionEventThread {
 };
 
 ControlThread controlThread;
-Event::IEventListenerHandle* setpointListener = nullptr;
+Event::EventListenerHandlePtr setpointListener;
 
 void setup() {
     Serial.begin(115200);
@@ -474,18 +486,20 @@ class TemperatureObserver : public IEventObserver<TemperatureChangeEvent> {
 };
 
 TemperatureObserver temperatureObserver;
-IEventListenerHandle* observerHandle =
+EventListenerHandlePtr observerHandle =
     eventThread.RegisterObserver<TemperatureChangeEvent>(&temperatureObserver);
 ```
 
-`IEventObserver<EventType>` derives from ESPressio Observable 2.0's `IObserver` interface. The Event library adapts its virtual methods into the existing asynchronous listener pipeline, so callback listeners and Observers can coexist for the same Event type and receive identical Event, dispatch-method, and priority values.
+`IEventObserver<EventType>` derives from ESPressio Observable 3.0's `IObserver` interface. The Event library adapts its virtual methods into the existing asynchronous listener pipeline, so callback listeners and Observers can coexist for the same Event type and receive identical Event, dispatch-method, and priority values.
 
-Observers are non-owning. An Observer must remain alive until its returned `IEventListenerHandle` has been unregistered or deleted. The handle remains owned by the caller, exactly as with `RegisterListener()`.
+Observers are non-owning. An Observer must remain alive until its returned
+`EventListenerHandlePtr` has been unregistered or destroyed. The owning smart
+pointer automatically unregisters and releases the registration.
 
 The normal listener interest modes are supported:
 
 ```cpp
-IEventListenerHandle* observerHandle =
+EventListenerHandlePtr observerHandle =
     eventThread.RegisterObserver<TemperatureChangeEvent>(
         &temperatureObserver,
         EventListenerInterest::YoungerThan,
@@ -587,7 +601,7 @@ using namespace ESPressio::Event;
 
 class TemperatureSerialLogger : public EventThread {
     private:
-        IEventListenerHandle* _temperatureChangeEventListener = RegisterListener<TemperatureChangeEvent>(
+        EventListenerHandlePtr _temperatureChangeEventListener = RegisterListener<TemperatureChangeEvent>(
             [&](TemperatureChangeEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
                 int temperatureChange =
                     event->GetNewTemperature() - event->GetPreviousTemperature();
@@ -607,9 +621,7 @@ class TemperatureSerialLogger : public EventThread {
     public:
         TemperatureSerialLogger() : EventThread(false) { }
 
-        ~TemperatureSerialLogger() {
-            delete _temperatureChangeEventListener;
-        }
+        ~TemperatureSerialLogger() = default;
 };
 ```
 The above shows how trivial it can be to implement an `EventThread` and define an `EventListener` for our `TemperatureChangeEvent` `Event` type. Because the event carries both readings, the listener can determine whether the temperature moved `UP` or `DOWN` and calculate the magnitude of the change without retaining any temperature state of its own.
@@ -621,8 +633,7 @@ Again, there are a few things to note here:
 * Any `class` intent on listening for and processing `Event`s *must* inherit from `EventThread`.
 * We can implement our `EventListener` in-place within the `class` declaration (as shown above), but we *can* also implement the same `EventListener` explicitly in a `constructor` if we prefer.
 * The `Event` type for the `EventListener` is specified by way of the template type specialization (`<TemperatureChangeEvent>` in this example)
-* Invoking the internal (`protected`) method of `EventThread` called `RegisterListener` will return a `pointer` to an `IEventListenerHandle`. This handle should be retained for the lifetime of the `_temperatureChangeEventListener` member. In this example, that lifetime is that of its parent (encapsulating) `TemperatureSerialLogger` class instance.
-* It is necessary to manage the lifetime of the `IEventListenerHandle` `pointer`, which we suitable handle in this example by declaring the `destructor` and instructing it to `delete _temperatureChangeEventListener;`. Failure to do this would result in a *memory leak* each time an instance of `TemperatureSerialLogger` is destroyed.
+* `RegisterListener` returns an owning `EventListenerHandlePtr`. Retain it for as long as the listener should remain registered; ordinary member destruction unregisters it automatically.
 
 Now we can move on to the module responsible for drawing the temperature on the hardware device's physical display unit.
 
@@ -639,7 +650,7 @@ using namespace ESPressio::Event;
 
 class TemperatureDisplay : public EventThread {
     private:
-        IEventListenerHandle* _temperatureChangeEventListener = RegisterListener<TemperatureChangeEvent>(
+        EventListenerHandlePtr _temperatureChangeEventListener = RegisterListener<TemperatureChangeEvent>(
             [&](TemperatureChangeEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
                 // Code here to render the value of `event->GetNewTemperature()` on the physical display unit for this hardware device.
             }
@@ -647,9 +658,7 @@ class TemperatureDisplay : public EventThread {
     public:
         TemperatureDisplay() : EventThread(false) { }
 
-        ~TemperatureDisplay() {
-            delete _temperatureChangeEventListener;
-        }
+        ~TemperatureDisplay() = default;
 };
 ```
 You will notice that the code is almost 100% identical for `TemperatureDisplay` and `TemperatureSerialLogger`. The only difference is the contents of the *Lambda Function* executed when the `TemperatureChangeEvent` is being processed by this `EventListener`.

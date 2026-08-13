@@ -7,7 +7,7 @@ namespace ESPressio {
     namespace Event {
 
         template <typename EventType>
-        IEventListenerHandle* IEventListener::RegisterListener(
+        EventListenerHandlePtr IEventListener::RegisterListener(
             std::function<void(
                 IEvent*,
                 EventDispatchMethod dispatchMethod,

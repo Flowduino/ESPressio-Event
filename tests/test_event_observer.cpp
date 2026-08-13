@@ -118,9 +118,9 @@ int main() {
     assert(nullThrown);
 
     MultiEventObserver multiObserver;
-    IEventListenerHandle* multiTestHandle =
+    EventListenerHandlePtr multiTestHandle =
         listener.RegisterObserver<TestEvent>(&multiObserver);
-    IEventListenerHandle* multiOtherHandle =
+    EventListenerHandlePtr multiOtherHandle =
         listener.RegisterObserver<OtherEvent>(&multiObserver);
     TestEvent multiTestEvent;
     OtherEvent multiOtherEvent;
@@ -128,17 +128,17 @@ int main() {
     Process(listener, multiOtherEvent);
     assert(multiObserver.testCalls == 1);
     assert(multiObserver.otherCalls == 1);
-    delete multiTestHandle;
-    delete multiOtherHandle;
+    multiTestHandle.reset();
+    multiOtherHandle.reset();
 
-    IEventListenerHandle* observerHandle =
+    EventListenerHandlePtr observerHandle =
         listener.RegisterObserver<TestEvent>(&observer);
     assert(observerHandle->IsRegistered());
     const int routingRegistrations = listener.registrations;
     const int routingUnregistrations = listener.unregistrations;
 
     int callbackCalls = 0;
-    IEventListenerHandle* callbackHandle = listener.RegisterListener<TestEvent>(
+    EventListenerHandlePtr callbackHandle = listener.RegisterListener<TestEvent>(
         [&](TestEvent*, EventDispatchMethod, EventPriority) { ++callbackCalls; });
     assert(listener.registrations == routingRegistrations);
 
@@ -158,12 +158,12 @@ int main() {
     assert(observer.calls == 1);
     assert(callbackCalls == 2);
     assert(listener.unregistrations == routingUnregistrations);
-    delete observerHandle;
-    delete callbackHandle;
+    observerHandle.reset();
+    callbackHandle.reset();
     assert(listener.unregistrations == routingUnregistrations + 1);
 
     TestObserver customObserver;
-    IEventListenerHandle* customHandle = listener.RegisterObserver<TestEvent>(
+    EventListenerHandlePtr customHandle = listener.RegisterObserver<TestEvent>(
         &customObserver, EventListenerInterest::Custom);
     customObserver.interested = false;
     Process(listener, event);
@@ -171,10 +171,10 @@ int main() {
     customObserver.interested = true;
     Process(listener, event);
     assert(customObserver.calls == 1);
-    delete customHandle;
+    customHandle.reset();
 
     TestObserver youngObserver;
-    IEventListenerHandle* youngHandle = listener.RegisterObserver<TestEvent>(
+    EventListenerHandlePtr youngHandle = listener.RegisterObserver<TestEvent>(
         &youngObserver,
         EventListenerInterest::YoungerThan,
         EventTime(10, ESPressio::Units::Milli)
@@ -184,19 +184,19 @@ int main() {
     Process(listener, youngEvent);
     Process(listener, oldEvent);
     assert(youngObserver.calls == 1);
-    delete youngHandle;
+    youngHandle.reset();
 
     TestObserver selfRemovingObserver;
-    IEventListenerHandle* selfRemovingHandle =
+    EventListenerHandlePtr selfRemovingHandle =
         listener.RegisterObserver<TestEvent>(&selfRemovingObserver);
-    selfRemovingObserver.unregisterOnEvent = selfRemovingHandle;
+    selfRemovingObserver.unregisterOnEvent = selfRemovingHandle.get();
     Process(listener, event);
     Process(listener, event);
     assert(selfRemovingObserver.calls == 1);
     assert(!selfRemovingHandle->IsRegistered());
-    delete selfRemovingHandle;
+    selfRemovingHandle.reset();
 
-    IEventListenerHandle* throwingHandle = listener.RegisterListener<TestEvent>(
+    EventListenerHandlePtr throwingHandle = listener.RegisterListener<TestEvent>(
         [](TestEvent*, EventDispatchMethod, EventPriority) {
             throw std::runtime_error("expected callback failure");
         });
@@ -206,13 +206,13 @@ int main() {
     catch (const std::runtime_error&) { callbackThrown = true; }
     assert(callbackThrown);
     assert(event.References() == referencesBeforeThrow);
-    delete throwingHandle;
+    throwingHandle.reset();
 
     OtherEvent otherEvent;
     Process(listener, otherEvent);
 
     TestObserver survivingObserver;
-    IEventListenerHandle* survivingHandle = nullptr;
+    EventListenerHandlePtr survivingHandle;
     {
         EventListener temporaryListener;
         survivingHandle = temporaryListener.RegisterObserver<TestEvent>(
@@ -221,13 +221,13 @@ int main() {
     }
     assert(!survivingHandle->IsRegistered());
     survivingHandle->Unregister();
-    delete survivingHandle;
+    survivingHandle.reset();
 
     TrackingEventListener shutdownListener;
-    IEventListenerHandle* shutdownHandle =
+    EventListenerHandlePtr shutdownHandle =
         shutdownListener.RegisterObserver<TestEvent>(&survivingObserver);
     shutdownListener.Shutdown();
     assert(shutdownListener.unregistrations == 1);
     assert(!shutdownHandle->IsRegistered());
-    delete shutdownHandle;
+    shutdownHandle.reset();
 }

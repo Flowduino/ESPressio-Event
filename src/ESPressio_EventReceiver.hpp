@@ -16,6 +16,10 @@
 #include "ESPressio_EventEnums.hpp"
 #include "ESPressio_IEvent.hpp"
 
+#ifndef ESPRESSIO_EVENT_DEFAULT_MAX_PENDING_EVENT_COUNT
+    #define ESPRESSIO_EVENT_DEFAULT_MAX_PENDING_EVENT_COUNT 64
+#endif
+
 namespace ESPressio {
     namespace Event {
 
@@ -64,8 +68,10 @@ namespace ESPressio {
                 EventCollection _priorityQueues;
                 EventCollection _priorityStacks;
                 size_t _pendingEventCount = 0;
+                size_t _processingEventCount = 0;
                 size_t _peakPendingEventCount = 0;
-                size_t _maximumPendingEventCount = 0;
+                size_t _maximumPendingEventCount =
+                    ESPRESSIO_EVENT_DEFAULT_MAX_PENDING_EVENT_COUNT;
                 EventQueueOverflowPolicy _overflowPolicy =
                     EventQueueOverflowPolicy::BlockProducer;
                 EventCollectionCapacityPolicy _capacityPolicy =
@@ -79,6 +85,10 @@ namespace ESPressio {
                 uint64_t _rejectedEventCount = 0;
                 uint64_t _droppedEventCount = 0;
                 bool _acceptingPendingEvents = true;
+
+                size_t RetainedEventCountLocked() const {
+                    return _pendingEventCount + _processingEventCount;
+                }
 
                 static uint64_t NextSequence(uint64_t& sequence) {
                     const uint64_t result = sequence;
@@ -218,7 +228,7 @@ namespace ESPressio {
                             return;
                         }
                         while (_maximumPendingEventCount > 0 &&
-                            _pendingEventCount >=
+                            RetainedEventCountLocked() >=
                                 _maximumPendingEventCount) {
                             if (!_acceptingPendingEvents) {
                                 ++_rejectedEventCount;
@@ -230,7 +240,7 @@ namespace ESPressio {
                                 case EventQueueOverflowPolicy::BlockProducer:
                                     _capacityAvailable.wait(lock, [&]() {
                                         return _maximumPendingEventCount == 0 ||
-                                            _pendingEventCount <
+                                            RetainedEventCountLocked() <
                                                 _maximumPendingEventCount ||
                                             !_acceptingPendingEvents ||
                                             _overflowPolicy !=
@@ -246,6 +256,12 @@ namespace ESPressio {
                                 case EventQueueOverflowPolicy::DropOldest:
                                     displacedEvent =
                                         RemoveOldestLocked().event;
+                                    if (displacedEvent == nullptr) {
+                                        ++_rejectedEventCount;
+                                        lock.unlock();
+                                        event->__unref();
+                                        return;
+                                    }
                                     ++_droppedEventCount;
                                     break;
                                 case EventQueueOverflowPolicy::
@@ -276,7 +292,8 @@ namespace ESPressio {
                         });
                         ++_pendingEventCount;
                         _peakPendingEventCount = std::max(
-                            _peakPendingEventCount, _pendingEventCount
+                            _peakPendingEventCount,
+                            RetainedEventCountLocked()
                         );
                         accepted = true;
                     } catch (...) {
@@ -312,9 +329,26 @@ namespace ESPressio {
                         }
                         pending.swap(found->second);
                         _pendingEventCount -= pending.size();
+                        _processingEventCount += pending.size();
                         RecordDrainSizeLocked(pending.size());
                     }
-                    _capacityAvailable.notify_all();
+
+                    class ProcessingGuard final {
+                        private:
+                            EventReceiver& _receiver;
+                            size_t _count;
+                        public:
+                            ProcessingGuard(EventReceiver& receiver, size_t count)
+                                : _receiver(receiver), _count(count) { }
+                            ~ProcessingGuard() {
+                                {
+                                    std::lock_guard<std::mutex> lock(
+                                        _receiver._eventsMutex);
+                                    _receiver._processingEventCount -= _count;
+                                }
+                                _receiver._capacityAvailable.notify_all();
+                            }
+                    } processing(*this, pending.size());
 
                     class PendingReferences final {
                         private:
