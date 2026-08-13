@@ -58,17 +58,17 @@ namespace ESPressio {
                     WithEvents([&](IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
                         std::type_index type = typeid(*event);
                         EventReceiverBucket* bucket = GetEventTypeBucket(type);
-                        bool wasHandled = false;
                         for (IEventReceiver* receiver : *bucket) {
                             if (dispatchMethod == EventDispatchMethod::Queue) {
                                 receiver->QueueEvent(event, priority);
                             } else {
                                 receiver->StackEvent(event, priority);
                             }
-                            event->__unref();
-                            wasHandled = true;
                         }
-                        if (!wasHandled) { event->__unref(); }
+                        // Release the single reference owned by this
+                        // dispatcher's pending collection. Each destination
+                        // receiver acquired its own reference above.
+                        event->__unref();
                     });
 
                     _eventReceiversMutex.unlock();

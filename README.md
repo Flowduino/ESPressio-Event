@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 Provides a foundation for designing, structuring, and implementing your embedded programs using Event Pattern (Event-Driven Development or "EDD").
 
 ## Latest Stable Version
-The latest Stable Version is [3.0.1](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.0.1).
+The latest Stable Version is [3.0.2](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.0.2).
 
 ## Compatibility
 
@@ -67,7 +67,7 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 lib_deps =
     flowduino/ESPressio-Threads@^1.4.1
     flowduino/ESPressio-Observable@^2.0.0
-    flowduino/ESPressio-Event@^3.0.1
+    flowduino/ESPressio-Event@^3.0.2
 ```
 
 Alternatively, if you want to use the bleeding-edge (effectively "Developer Integration Testing" or "DIT") sources, you can instead use:

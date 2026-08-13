@@ -39,6 +39,20 @@ namespace ESPressio {
             EventCollection _priorityQueuesAlt; // This Queue will be used when the primary Queue is being processed!
             EventCollection _priorityStacks;
             EventCollection _priorityStacksAlt; // This Stack will be used when the primary Stack is being processed!
+
+            void ClearEventCollection(EventCollection& eventCollection) {
+                for (auto& entry : eventCollection) {
+                    EventDispatchCollection* collection = entry.second;
+                    if (collection == nullptr) {
+                        continue;
+                    }
+                    for (IEvent* event : *collection) {
+                        event->__unref();
+                    }
+                    delete collection;
+                }
+                eventCollection.clear();
+            }
         
         // Methods
 
@@ -65,7 +79,7 @@ namespace ESPressio {
             }
 
             EventDispatchCollection* GetPriorityStack(EventPriority priority) {
-                EventDispatchCollection* stack = _priorityQueues[priority];
+                EventDispatchCollection* stack = _priorityStacks[priority];
                 
                 if (stack == nullptr) { // If the stack does not exist, let's create it
                     stack = new EventDispatchCollection();
@@ -153,18 +167,10 @@ namespace ESPressio {
         public:
 
             virtual ~EventReceiver() {
-                for (auto it = _priorityQueues.begin(); it != _priorityQueues.end(); ++it) {
-                    delete it->second;
-                }
-                for (auto it = _priorityQueuesAlt.begin(); it != _priorityQueuesAlt.end(); ++it) {
-                    delete it->second;
-                }
-                for (auto it = _priorityStacks.begin(); it != _priorityStacks.end(); ++it) {
-                    delete it->second;
-                }
-                for (auto it = _priorityStacksAlt.begin(); it != _priorityStacksAlt.end(); ++it) {
-                    delete it->second;
-                }
+                ClearEventCollection(_priorityQueues);
+                ClearEventCollection(_priorityQueuesAlt);
+                ClearEventCollection(_priorityStacks);
+                ClearEventCollection(_priorityStacksAlt);
             }
         
         // Methods
