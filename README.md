@@ -47,6 +47,9 @@ The namespace provides the following (*click on any declaration to navigate to m
 - [`ESPressio::Event::Event`](#event)
 - [`ESPressio::Event::IEventThread`](#ieventthread)
 - [`ESPressio::Event::EventThread`](#eventthread)
+- [`ESPressio::Event::PrecisionEventThread`](#precisioneventthread)
+- `ESPressio::Event::PrecisionEventProcessOrder`
+- `ESPressio::Event::PrecisionEventArrivalPolicy`
 - `ESPressio::Event::IEventObserver<EventType>`
 
 ## Dependencies
@@ -181,7 +184,157 @@ Once all `Event`s relevant to your `EventThread` have been processed, the `Event
 
 You will see examples of `EventThread` in action later in this document.
 
->Remember: While only `EventThread` descendants may receive and process `Event`s, an `Event` may be created and dispatched from *anywhere* in your code at any time.
+>Remember: While only Event-capable Thread types such as `EventThread`,
+>`EventThreadWithLoop`, and `PrecisionEventThread` may receive and process
+>`Event`s, an `Event` may be created and dispatched from *anywhere* in your
+>code at any time.
+
+### `PrecisionEventThread`
+
+`PrecisionEventThread` combines the typed Event reception and listener
+capabilities of `EventThread` with the high-resolution periodic scheduling of
+ESPressio-Threads `PrecisionThread`.
+
+Use it when a component must perform work at a controlled cadence while also
+accepting Events which update the state used by that work. An ordinary
+`EventThread` remains the better choice when work should happen only in direct
+response to an Event. `EventThreadWithLoop` remains suitable for an
+unregulated continuous loop with Event processing before or after each loop.
+
+Derive from `PrecisionEventThread` and implement `OnIteration()`:
+
+```cpp
+void OnIteration(
+    IterationTime delta,
+    IterationTime startTime,
+    Threads::SkippedIterationCount skippedIterations
+) override;
+```
+
+The inherited `PrecisionThread` implementation retains ownership of its final
+scheduling loop. `PrecisionEventThread` processes pending Events around the
+consumer's `OnIteration()` hook and retains all inherited timing configuration,
+statistics, lifecycle observation, and precision-iteration observation.
+
+#### Event Processing Order
+
+Use `SetEventProcessOrder()` to select where pending Events are processed:
+
+- `PrecisionEventProcessOrder::EventsBeforeIteration` processes Events before
+  `OnIteration()` and is the default. This is useful when Events update inputs
+  or configuration needed by the current iteration.
+- `PrecisionEventProcessOrder::EventsAfterIteration` invokes `OnIteration()`
+  first and processes Events afterward. Their changes become visible to the
+  next iteration.
+
+The policy is snapshotted once per iteration. Changing it concurrently cannot
+cause one iteration to process Events both before and after `OnIteration()`.
+
+#### Event Arrival Policy
+
+Use `SetEventArrivalPolicy()` to control whether a newly received Event affects
+the current schedule:
+
+- `PrecisionEventArrivalPolicy::ProcessOnNextIteration` leaves the Event queued
+  until the next scheduled iteration and is the default. It preserves cadence,
+  with an Event latency of up to one iteration period.
+- `PrecisionEventArrivalPolicy::TriggerImmediateIteration` calls the inherited
+  `Bump()` operation when an Event arrives. The waiting Thread wakes and begins
+  an iteration immediately. That iteration reports zero skipped iterations
+  unless scheduled deadlines were independently missed, and the regular
+  cadence continues from the immediate iteration.
+
+An Event arriving while the Thread is paused remains queued. Neither policy
+implicitly resumes a paused Thread; `Start()` processes the Event after the
+Thread resumes.
+
+Each Event phase drains all currently pending stacks and queues in their normal
+priority and dispatch order. Event handlers therefore contribute to iteration
+duration and can cause later deadlines to be skipped. Keep handlers short;
+`skippedIterations` and the inherited frequency statistics expose the effects
+of overruns.
+
+#### Precision Event Thread Example
+
+```cpp
+#include <ESPressio_Event.hpp>
+#include <ESPressio_PrecisionEventThread.hpp>
+#include <ESPressio_ThreadManager.hpp>
+
+using namespace ESPressio;
+
+class SetpointEvent final : public Event::Event {
+    private:
+        const int _setpoint;
+
+    public:
+        explicit SetpointEvent(int setpoint) : _setpoint(setpoint) { }
+        int GetSetpoint() const { return _setpoint; }
+};
+
+class ControlThread final : public Event::PrecisionEventThread {
+    private:
+        int _setpoint = 0;
+
+    protected:
+        void OnIteration(
+            IterationTime delta,
+            IterationTime startTime,
+            Threads::SkippedIterationCount skippedIterations
+        ) override {
+            (void)delta;
+            (void)startTime;
+
+            Serial.printf(
+                "control setpoint=%d skipped=%llu\n",
+                _setpoint,
+                static_cast<unsigned long long>(skippedIterations)
+            );
+        }
+
+    public:
+        void ApplySetpoint(SetpointEvent* event) {
+            _setpoint = event->GetSetpoint();
+        }
+};
+
+ControlThread controlThread;
+Event::IEventListenerHandle* setpointListener = nullptr;
+
+void setup() {
+    Serial.begin(115200);
+
+    controlThread.SetIterationPeriod(
+        Units::MilliSeconds<uint64_t>(10)
+    );
+    controlThread.SetEventProcessOrder(
+        Event::PrecisionEventProcessOrder::EventsBeforeIteration
+    );
+    controlThread.SetEventArrivalPolicy(
+        Event::PrecisionEventArrivalPolicy::ProcessOnNextIteration
+    );
+
+    setpointListener = controlThread.RegisterListener<SetpointEvent>(
+        [](SetpointEvent* event, Event::EventDispatchMethod, Event::EventPriority) {
+            controlThread.ApplySetpoint(event);
+        }
+    );
+
+    Threads::ThreadManager::GetInstance()->Initialize();
+}
+
+void loop() {
+    static int nextSetpoint = 1;
+    (new SetpointEvent(nextSetpoint++))->Queue();
+    delay(1000);
+}
+```
+
+`PrecisionEventThread` inherits `RegisterThreadObserver()` and
+`RegisterIterationObserver()`. Typed Event Observers continue to register
+through `RegisterObserver<EventType>()`. A single object may implement all
+three Observer interfaces and register separately for lifecycle, iteration,
+and Event notifications.
 
 ### `EventListener`
 An `EventListener` is analogous of an *Event Processor*.
