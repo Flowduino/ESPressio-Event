@@ -52,7 +52,7 @@ The namespace provides the following (*click on any declaration to navigate to m
 ## Dependencies
 The ESPressio Event library depends on:
 
-* [`ESPressio Threads`](http://github.com/Flowduino/ESPressio-Threads) 1.3.0 or later for asynchronous Event processing.
+* [`ESPressio Threads`](https://github.com/Flowduino/ESPressio-Threads) 1.4.0 or later for asynchronous Event processing.
 * [`ESPressio Observable`](https://github.com/Flowduino/ESPressio-Observable) 2.0.0 or later for its common `IObserver` contract and typed Event Observer support.
 
 PlatformIO resolves both dependencies from `library.json` automatically.
@@ -62,7 +62,7 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Thread@^1.3.0
+    flowduino/ESPressio-Threads@^1.4.0
     flowduino/ESPressio-Observable@^2.0.0
     flowduino/ESPressio-Event@^2.1.0
 ```
