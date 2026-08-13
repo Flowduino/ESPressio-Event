@@ -103,7 +103,6 @@ void Process(
     IEvent& event,
     EventDispatchMethod method = EventDispatchMethod::Queue,
     EventPriority priority = EventPriority::Normal) {
-    event.__ref();
     listener.ProcessEvent(&event, method, priority);
 }
 

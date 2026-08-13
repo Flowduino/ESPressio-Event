@@ -53,7 +53,7 @@ namespace ESPressio {
                 }
 
                 void DispatchEvents() {
-                    _eventReceiversMutex.lock();
+                    std::lock_guard<std::mutex> lock(_eventReceiversMutex);
 
                     WithEvents([&](IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
                         std::type_index type = typeid(*event);
@@ -65,13 +65,8 @@ namespace ESPressio {
                                 receiver->StackEvent(event, priority);
                             }
                         }
-                        // Release the single reference owned by this
-                        // dispatcher's pending collection. Each destination
-                        // receiver acquired its own reference above.
-                        event->__unref();
                     });
 
-                    _eventReceiversMutex.unlock();
                 }
             public:
                 EventDispatcher() { }

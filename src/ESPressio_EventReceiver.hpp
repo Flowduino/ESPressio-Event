@@ -108,29 +108,70 @@ namespace ESPressio {
                     EventPriority)> callback,
                 EventDispatchMethod iterationOrder
             ) {
-                // Iterate the `EventPriority` from highest value to lowest value...
+                // Iterate EventPriority from highest value to lowest value.
                 for (int priorityID = static_cast<uint8_t>(EventPriority::High); priorityID >= 0; priorityID--) {
                     EventPriority priority = static_cast<EventPriority>(priorityID);
-                    EventDispatchCollection* collection = eventCollection[priority]; // Check that a Vector of `IEvent*` exists for the current `EventPriority`...
-                    if (collection != nullptr) {
-
-                        if (iterationOrder == EventDispatchMethod::Stack) {
-                            for (auto it = collection->rbegin(); it != collection->rend(); ++it) { // Iterate the `IEvent*` in the Vector from last to first...
-                                (*it)->__ref();
-                                callback((*it), EventDispatchMethod::Stack, priority); // Call the Callback Method with the `Event` and its Dispatch Time as parameters...
-                                (*it)->__unref();
-                            }
-                        }
-                        else {
-                            for (auto it = collection->begin(); it != collection->end(); ++it) { // Iterate the `IEvent*` in the Vector from first to last...
-                                (*it)->__ref();
-                                callback((*it), EventDispatchMethod::Queue, priority); // Call the Callback Method with the `Event` and its Dispatch Time as parameters...
-                                (*it)->__unref();
-                            }
-                        }
-                        collection->clear(); // Clear the Vector
-                        // Print the number of items in the collection to the Serial console
+                    const auto collectionEntry = eventCollection.find(priority);
+                    if (collectionEntry == eventCollection.end() ||
+                        collectionEntry->second == nullptr) {
+                        continue;
                     }
+
+                    EventDispatchCollection* collection =
+                        collectionEntry->second;
+                    EventDispatchCollection pendingEvents;
+                    pendingEvents.swap(*collection);
+
+                    class PendingEventReferences final {
+                        private:
+                            EventDispatchCollection& _events;
+
+                        public:
+                            explicit PendingEventReferences(
+                                EventDispatchCollection& events
+                            ) : _events(events) { }
+
+                            ~PendingEventReferences() {
+                                for (IEvent* event : _events) {
+                                    if (event != nullptr) {
+                                        event->__unref();
+                                    }
+                                }
+                            }
+
+                            void Release(size_t index) {
+                                _events[index]->__unref();
+                                _events[index] = nullptr;
+                            }
+                    } pendingEventReferences(pendingEvents);
+
+                    if (iterationOrder == EventDispatchMethod::Stack) {
+                        for (size_t index = pendingEvents.size();
+                            index > 0; --index) {
+                            const size_t eventIndex = index - 1;
+                            callback(
+                                pendingEvents[eventIndex],
+                                EventDispatchMethod::Stack,
+                                priority
+                            );
+                            pendingEventReferences.Release(eventIndex);
+                        }
+                    } else {
+                        for (size_t index = 0;
+                            index < pendingEvents.size(); ++index) {
+                            callback(
+                                pendingEvents[index],
+                                EventDispatchMethod::Queue,
+                                priority
+                            );
+                            pendingEventReferences.Release(index);
+                        }
+                    }
+
+                    // Retain the allocation for the next drain without
+                    // retaining any Event pointers.
+                    pendingEvents.clear();
+                    pendingEvents.swap(*collection);
                 }
             }
         protected:
@@ -145,21 +186,34 @@ namespace ESPressio {
                     EventPriority)> callback
             ) {
                 // We process the Stacks first in Priority Order (Highest to Lowest)
-                _mutexStacks.lock();
-                WithEventCollection(_priorityStacks, callback, EventDispatchMethod::Stack);
-                _mutexStacks.unlock();
-
-                _mutexStacksAlt.lock();
-                WithEventCollection(_priorityStacksAlt, callback, EventDispatchMethod::Stack);
-                _mutexStacksAlt.unlock();
-
-                _mutexQueues.lock();
-                WithEventCollection(_priorityQueues, callback, EventDispatchMethod::Queue);
-                _mutexQueues.unlock();
-
-                _mutexQueuesAlt.lock();
-                WithEventCollection(_priorityQueuesAlt, callback, EventDispatchMethod::Queue);
-                _mutexQueuesAlt.unlock();
+                {
+                    std::lock_guard<std::mutex> lock(_mutexStacks);
+                    WithEventCollection(
+                        _priorityStacks, callback,
+                        EventDispatchMethod::Stack
+                    );
+                }
+                {
+                    std::lock_guard<std::mutex> lock(_mutexStacksAlt);
+                    WithEventCollection(
+                        _priorityStacksAlt, callback,
+                        EventDispatchMethod::Stack
+                    );
+                }
+                {
+                    std::lock_guard<std::mutex> lock(_mutexQueues);
+                    WithEventCollection(
+                        _priorityQueues, callback,
+                        EventDispatchMethod::Queue
+                    );
+                }
+                {
+                    std::lock_guard<std::mutex> lock(_mutexQueuesAlt);
+                    WithEventCollection(
+                        _priorityQueuesAlt, callback,
+                        EventDispatchMethod::Queue
+                    );
+                }
             }
 
             virtual void EventAdded() {};
@@ -178,16 +232,21 @@ namespace ESPressio {
             void QueueEvent(IEvent* event, EventPriority priority = EventPriority::Normal) {
                 event->__dispatch();
                 event->__ref();
-                if (_mutexQueues.try_lock()) {
-                    EventDispatchCollection* queue = GetPriorityQueue(priority);
-                    queue->push_back(event);
-                    _mutexQueues.unlock();
-                }
-                else {
-                    _mutexQueuesAlt.lock();
-                    EventDispatchCollection* queue = GetPriorityQueueAlt(priority);
-                    queue->push_back(event);
-                    _mutexQueuesAlt.unlock();
+                try {
+                    std::unique_lock<std::mutex> queueLock(
+                        _mutexQueues, std::try_to_lock
+                    );
+                    if (queueLock.owns_lock()) {
+                        GetPriorityQueue(priority)->push_back(event);
+                    } else {
+                        std::lock_guard<std::mutex> alternateQueueLock(
+                            _mutexQueuesAlt
+                        );
+                        GetPriorityQueueAlt(priority)->push_back(event);
+                    }
+                } catch (...) {
+                    event->__unref();
+                    throw;
                 }
                 EventAdded();
             }
@@ -195,15 +254,21 @@ namespace ESPressio {
             void StackEvent(IEvent* event, EventPriority priority = EventPriority::Normal) {
                 event->__dispatch();
                 event->__ref();
-                if (_mutexStacks.try_lock()) {
-                    EventDispatchCollection* stack = GetPriorityStack(priority);
-                    stack->push_back(event);
-                    _mutexStacks.unlock();
-                }
-                else {
-                    std::lock_guard<std::mutex> lock(_mutexStacksAlt);
-                    EventDispatchCollection* stack = GetPriorityStackAlt(priority);
-                    stack->push_back(event);
+                try {
+                    std::unique_lock<std::mutex> stackLock(
+                        _mutexStacks, std::try_to_lock
+                    );
+                    if (stackLock.owns_lock()) {
+                        GetPriorityStack(priority)->push_back(event);
+                    } else {
+                        std::lock_guard<std::mutex> alternateStackLock(
+                            _mutexStacksAlt
+                        );
+                        GetPriorityStackAlt(priority)->push_back(event);
+                    }
+                } catch (...) {
+                    event->__unref();
+                    throw;
                 }
                 EventAdded();
             }

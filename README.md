@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 Provides a foundation for designing, structuring, and implementing your embedded programs using Event Pattern (Event-Driven Development or "EDD").
 
 ## Latest Stable Version
-The latest Stable Version is [3.0.2](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.0.2).
+The latest Stable Version is [3.0.3](https://github.com/Flowduino/ESPressio-Event/releases/tag/3.0.3).
 
 ## Compatibility
 
@@ -67,7 +67,7 @@ You can quickly and easily add this library to your project in PlatformIO by sim
 lib_deps =
     flowduino/ESPressio-Threads@^1.4.1
     flowduino/ESPressio-Observable@^2.0.0
-    flowduino/ESPressio-Event@^3.0.2
+    flowduino/ESPressio-Event@^3.0.3
 ```
 
 Alternatively, if you want to use the bleeding-edge (effectively "Developer Integration Testing" or "DIT") sources, you can instead use:
@@ -165,6 +165,12 @@ Additionally, every `EventListener` will process the same `Event` *on its own `E
 >TL;DR: No member of an `Event` may be modified once the `Event` has been dispatched (`Queue()` or `Stack()`).
 
 `Event`s are also **reference counted** once dispatched. This means that you should **not** retain a *reference* or *pointer* to an `Event` once it has been dispatched, because the `Event` will be automatically destroyed once all `EventListener`s have processed it.
+
+Each receiving collection owns exactly one reference until that Event is
+removed for processing. Collection draining releases that ownership
+automatically, including when a listener throws or processing is otherwise
+aborted. Listener callbacks must not call the internal `__ref()` or
+`__unref()` operations.
 
 >Remember: `Event`s are *"fire and forget."*
 

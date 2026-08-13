@@ -390,15 +390,6 @@ namespace ESPressio {
                 }
 
                 inline void ProcessEvent(IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                    class EventReferenceGuard {
-                        private:
-                            IEvent* _event;
-                        public:
-                            explicit EventReferenceGuard(IEvent* guardedEvent)
-                                : _event(guardedEvent) {}
-                            ~EventReferenceGuard() { _event->__unref(); }
-                    } eventReferenceGuard(event);
-
                     EventListeners listeners;
                     {
                         std::shared_lock<std::shared_mutex> lock(_eventListenersMutex);
