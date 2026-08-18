@@ -9,6 +9,7 @@ set(COMPONENT_ADD_INCLUDEDIRS
 set(COMPONENT_REQUIRES
     "ESPressio_Threads"
     "ESPressio_Observable"
+    "ESPressio_Timing"
 )
 
 register_component()

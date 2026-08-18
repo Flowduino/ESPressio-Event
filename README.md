@@ -4,19 +4,54 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 
 ESPressio Event provides asynchronous typed Event routing, Event-aware Threads, bounded receiver queues, listener/observer registration, priority dispatch, and high-resolution Event timing for ESP32 applications.
 
-## Version 5.0.1
+## Version 5.1.0
 
-Version `5.0.1` is the first corrective patch for the 5.x architecture introduced in 5.0.0 aligned with:
+Version `5.1.0` extends the 5.x architecture with opt-in System Clock Observer-to-Event bridging, aligned with:
 
 ```text
 ESPressio Threads >= 3.0.0
 ESPressio Observable >= 3.0.0
+ESPressio Timing >= 2.2.0
 ```
 
-Timing 2.x and ESPressio Units are provided transitively through ESPressio Threads.
+Timing 2.2 is now also declared directly because the optional System Clock Event bridge compiles against its public Observer API. ESPressio Units remains available transitively through the dependency stack.
 
-This release removes the remaining Timing 1.x assumptions from Event and adds optional ESPressio Serializable Event support without making ESPressio Serializable a mandatory dependency.
+Serializable Event support remains optional: ordinary Event and Timing Event bridge users do not acquire an ESPressio Serializable dependency.
 
+
+
+### 5.1.0 Timing Event bridge
+
+Version `5.1.0` adds an explicit bridge from ESPressio Timing 2.2 System Clock Observer notifications into asynchronous ESPressio Events.
+
+The ordinary bridge is opt-in:
+
+```cpp
+#include <ESPressio_SystemClockEventBridge.hpp>
+
+Event::SystemClockEventBridge::GetInstance().Initialize();
+```
+
+Timing Events are grouped under `src/timing-events/` and batch-imported by:
+
+```cpp
+#include <ESPressio_TimingEvents.hpp>
+```
+
+Every `ISystemClockObserver` callback has a corresponding strongly typed Event carrying the callback snapshot, including synchronization before/after values, immediate clock difference, synchronization result/status, state changes, configuration changes, and callback lifecycle information.
+
+Serializable counterparts are also provided without making ESPressio Serializable a mandatory dependency:
+
+```cpp
+#include <ESPressio_TimingEvents_Serializable.hpp>
+#include <ESPressio_SystemClockEventBridge_Serializable.hpp>
+
+Event::SerializableSystemClockEventBridge::GetInstance().Initialize();
+```
+
+Serializable timing Events flatten Timing synchronization/configuration structures into stable primitive payload fields. `std::exception_ptr` is deliberately converted to a portable exception-message string in the Serializable callback-failure Event.
+
+Both bridges are dormant until `Initialize()` is explicitly called, and `Shutdown()` releases the retained Observable registration handle.
 
 ### 5.0.1 corrective fixes
 
@@ -54,7 +89,7 @@ Normal Event applications require only the dependencies declared by the library:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.0.1
+    flowduino/ESPressio-Event@^5.1.0
 ```
 
 The mandatory dependency graph is:
@@ -240,7 +275,7 @@ A consuming application which uses Serializable Events declares:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.0.1
+    flowduino/ESPressio-Event@^5.1.0
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 

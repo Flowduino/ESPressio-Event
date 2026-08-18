@@ -20,7 +20,7 @@
         "type": "git",
         "url": "https://github.com/Flowduino/ESPressio-Event.git"
     },
-    "version": "5.0.1",
+    "version": "5.1.0",
     "license": "Apache-2.0",
     "frameworks": "arduino",
     "platforms": "espressif32",
@@ -36,6 +36,11 @@
             "version": ">=3.0.0",
             "url": "https://github.com/Flowduino/ESPressio-Observable.git",
             "platforms": "*"
+        },
+        {
+            "owner": "flowduino",
+            "name": "ESPressio-Timing",
+            "version": ">=2.2.0"
         }
     ]
 }

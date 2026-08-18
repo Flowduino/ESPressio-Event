@@ -1,0 +1,14 @@
+#pragma once
+
+#include "timing-events/ESPressio_SystemClockTimeChangedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SynchronizationSampleAcceptedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SynchronizationSampleRejectedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SystemClockSynchronizedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SynchronizationStateChangedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SynchronizationResetEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SynchronizationConfigurationChangedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SystemClockCallbackScheduledEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SystemClockCallbackScheduleFailedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SystemClockCallbackExecutedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SystemClockCallbackExecutionFailedEvent_Serializable.hpp"
+#include "timing-events/ESPressio_SystemClockCallbacksClearedEvent_Serializable.hpp"
