@@ -2,53 +2,60 @@
 
 #include <cstdint>
 
-#include <ESPressio_IClock.hpp>
-#include <ESPressio_ThreadSafe.hpp>
+#include <ESPressio_ClockTypes.hpp>
 
 #include "ESPressio_EventEnums.hpp"
-
-using namespace ESPressio::Threads;
-
-#define ESPRESSIO_EVENT_STRICT_THREADSAFE
 
 namespace ESPressio {
 
     namespace Event {
 
-        using EventTime = Timing::ClockTime;
+        /*
+         * Default Event timing type used by type-erased listener filtering and
+         * by Event<> when no explicit representation is selected.
+         */
+        using EventTime =
+            Timing::DefaultClockTime;
 
+
+        /*
+         * Type-erased Event engine contract.
+         *
+         * Public typed Event time values deliberately do not appear here.
+         * Routing, reference ownership, receivers and listeners therefore
+         * remain independent of the selected Event<TTime> representation.
+         */
         class IEvent {
             public:
                 virtual ~IEvent() = default;
-            // Engine Methods
 
-                /// `__ref` increases the Reference Count for an `IEvent` object.
-                /// You should not call this method in your code under normal circumstances.
-                virtual void __ref() noexcept = 0; /// Not intended for client use!
+                // Engine Methods
+                virtual void __ref() noexcept = 0;
+                virtual void __unref() noexcept = 0;
+                virtual void __dispatch() = 0;
 
-                /// `__unref` decreases the Reference Count for an `IEvent` object.
-                /// You should not call this method in your code under normal circumstances.
-                virtual void __unref() noexcept = 0; /// Not intended for client use!
+                // Client Methods
+                virtual void Queue(
+                    EventPriority priority =
+                        EventPriority::Normal
+                ) = 0;
 
-                /// `__dispatch` is called by the Event Engine to record necessary point-of-dispatch information
-                /// Do not call this in your own code.
-                virtual void __dispatch() = 0; /// Not intended for client use!
+                virtual void Stack(
+                    EventPriority priority =
+                        EventPriority::Normal
+                ) = 0;
 
-            // Client Methods
+                /*
+                 * Type-erased lifecycle timing for Event infrastructure.
+                 *
+                 * These values are local System Clock nanoseconds and are not
+                 * serialized by SerializableEvent.
+                 */
+                virtual uint64_t
+                GetDispatchTimeNanoseconds() const = 0;
 
-                /// `Queue` dispatches the Event through the Central `EventManager`, and places it on the Event Queue
-                virtual void Queue(EventPriority priority = EventPriority::Normal) = 0;
-
-                /// `Stack` dispatches the Event through the Central `EventManager` and places it at the top of the Event Stack
-                virtual void Stack(EventPriority priority = EventPriority::Normal) = 0;
-
-            // Getters
-
-                /// Returns the System Clock time at which the Event was first dispatched.
-                virtual EventTime GetDispatchTime() = 0;
-
-                /// Returns the elapsed System Clock time since first dispatch.
-                virtual EventTime GetTimeSinceDispatch() = 0;
+                virtual uint64_t
+                GetTimeSinceDispatchNanoseconds() const = 0;
         };
 
     }

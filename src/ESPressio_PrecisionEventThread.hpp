@@ -14,209 +14,417 @@
 #include "ESPressio_EventThread.hpp"
 
 namespace ESPressio {
+
     namespace Event {
 
-        enum class PrecisionEventProcessOrder : uint8_t {
+        enum class PrecisionEventProcessOrder :
+            uint8_t {
             EventsBeforeIteration,
             EventsAfterIteration
         };
 
-        enum class PrecisionEventArrivalPolicy : uint8_t {
+
+        enum class PrecisionEventArrivalPolicy :
+            uint8_t {
             ProcessOnNextIteration,
             TriggerImmediateIteration,
             ProcessImmediately
         };
 
+
+        template<
+            typename TTime =
+                Timing::DefaultClockTime,
+            typename TRepresentationTraits =
+                Threads::
+                    PrecisionThreadTraits<
+                        TTime
+                    >
+        >
         class PrecisionEventThread :
-            public Threads::PrecisionThread,
+            public Threads::
+                PrecisionThread<
+                    TTime,
+                    TRepresentationTraits
+                >,
             public EventReceiver,
             public IEventThreadBase,
             public EventListener,
             public IEventThread {
+
             private:
-                mutable std::mutex _eventPolicyMutex;
-                PrecisionEventProcessOrder _eventProcessOrder =
-                    PrecisionEventProcessOrder::EventsBeforeIteration;
-                PrecisionEventArrivalPolicy _eventArrivalPolicy =
-                    PrecisionEventArrivalPolicy::ProcessOnNextIteration;
-                std::atomic<bool> _acceptingEvents{true};
+                using PrecisionThreadBase =
+                    Threads::
+                        PrecisionThread<
+                            TTime,
+                            TRepresentationTraits
+                        >;
+
+                mutable std::mutex
+                    _eventPolicyMutex;
+
+                PrecisionEventProcessOrder
+                    _eventProcessOrder =
+                        PrecisionEventProcessOrder::
+                            EventsBeforeIteration;
+
+                PrecisionEventArrivalPolicy
+                    _eventArrivalPolicy =
+                        PrecisionEventArrivalPolicy::
+                            ProcessOnNextIteration;
+
+                std::atomic<bool>
+                    _acceptingEvents{true};
+
 
                 class LifecycleObserver final :
-                    public Threads::IThreadObserver {
-                    private:
-                        PrecisionEventThread* _owner;
-                    public:
-                        explicit LifecycleObserver(
-                            PrecisionEventThread* owner
-                        ) : _owner(owner) { }
+                    public Threads::
+                        IThreadObserver {
 
-                        void OnThreadExecutionFailed(
-                            Threads::IThread*, std::exception_ptr
-                        ) override {
-                            _owner->_stopReceivingEvents();
+                    private:
+                        PrecisionEventThread*
+                            _owner;
+
+                    public:
+                        explicit
+                        LifecycleObserver(
+                            PrecisionEventThread*
+                                owner
+                        ) :
+                            _owner(owner) {
                         }
 
-                        void OnThreadTerminated(
+
+                        void
+                        OnThreadExecutionFailed(
+                            Threads::IThread*,
+                            std::exception_ptr
+                        ) override {
+                            _owner->
+                                StopReceivingEvents();
+                        }
+
+
+                        void
+                        OnThreadTerminated(
                             Threads::IThread*
                         ) override {
-                            _owner->_stopReceivingEvents();
+                            _owner->
+                                StopReceivingEvents();
                         }
-                } _lifecycleObserver{this};
-                std::unique_ptr<Observable::IObserverHandle>
-                    _lifecycleObserverHandle;
+                };
 
-                void _stopReceivingEvents() noexcept {
-                    if (!_acceptingEvents.exchange(false)) {
+
+                LifecycleObserver
+                    _lifecycleObserver{
+                        this
+                    };
+
+                Observable::
+                    ObserverHandlePtr
+                        _lifecycleObserverHandle;
+
+
+                void StopReceivingEvents()
+                    noexcept {
+                    if (
+                        !_acceptingEvents.
+                            exchange(false)
+                    ) {
                         return;
                     }
+
                     StopAcceptingEvents();
+
                     try {
                         UnregisterAllListeners();
-                    } catch (...) { }
+                    } catch (...) {
+                    }
+
                     ClearPendingEvents();
                 }
 
-                void _processPendingEvents() {
-                    WithEvents([&](
-                        IEvent* event,
-                        EventDispatchMethod dispatchMethod,
-                        EventPriority priority
-                    ) {
-                        ProcessEvent(event, dispatchMethod, priority);
-                    });
+
+                void ProcessPendingEvents() {
+                    WithEvents(
+                        [&](
+                            IEvent* event,
+                            EventDispatchMethod
+                                dispatchMethod,
+                            EventPriority priority
+                        ) {
+                            ProcessEvent(
+                                event,
+                                dispatchMethod,
+                                priority
+                            );
+                        }
+                    );
                 }
 
+
             protected:
+                using typename
+                    PrecisionThreadBase::
+                        IterationTime;
+
+                using typename
+                    PrecisionThreadBase::
+                        TimeType;
+
+                using typename
+                    PrecisionThreadBase::
+                        IterationFrequency;
+
+                using typename
+                    PrecisionThreadBase::
+                        SignedIterationTime;
+
+
                 void Iterate(
                     IterationTime delta,
                     IterationTime startTime,
-                    Threads::SkippedIterationCount skippedIterations
+                    Threads::
+                        SkippedIterationCount
+                            skippedIterations
                 ) final override {
                     try {
-                        PrecisionEventProcessOrder processOrder;
+                        PrecisionEventProcessOrder
+                            processOrder;
+
                         {
-                            std::lock_guard<std::mutex> lock(
+                            std::lock_guard<
+                                std::mutex
+                            > lock(
                                 _eventPolicyMutex
                             );
-                            processOrder = _eventProcessOrder;
+
+                            processOrder =
+                                _eventProcessOrder;
                         }
 
-                        if (processOrder == PrecisionEventProcessOrder::
-                            EventsBeforeIteration) {
-                            _processPendingEvents();
+                        if (
+                            processOrder ==
+                            PrecisionEventProcessOrder::
+                                EventsBeforeIteration
+                        ) {
+                            ProcessPendingEvents();
                         }
 
-                        OnIteration(delta, startTime, skippedIterations);
+                        OnIteration(
+                            delta,
+                            startTime,
+                            skippedIterations
+                        );
 
-                        if (processOrder == PrecisionEventProcessOrder::
-                            EventsAfterIteration) {
-                            _processPendingEvents();
+                        if (
+                            processOrder ==
+                            PrecisionEventProcessOrder::
+                                EventsAfterIteration
+                        ) {
+                            ProcessPendingEvents();
                         }
                     } catch (...) {
-                        _stopReceivingEvents();
+                        StopReceivingEvents();
                         throw;
                     }
                 }
+
 
                 virtual void OnIteration(
                     IterationTime delta,
                     IterationTime startTime,
-                    Threads::SkippedIterationCount skippedIterations
+                    Threads::
+                        SkippedIterationCount
+                            skippedIterations
                 ) = 0;
 
-                void OnWorkWake() final override {
+
+                void OnWorkWake()
+                    final override {
                     try {
-                        _processPendingEvents();
+                        ProcessPendingEvents();
                     } catch (...) {
-                        _stopReceivingEvents();
+                        StopReceivingEvents();
                         throw;
                     }
                 }
 
-                void EventAdded() override {
-                    PrecisionEventArrivalPolicy arrivalPolicy;
+
+                void EventAdded()
+                    override {
+                    PrecisionEventArrivalPolicy
+                        arrivalPolicy;
+
                     {
-                        std::lock_guard<std::mutex> lock(
+                        std::lock_guard<
+                            std::mutex
+                        > lock(
                             _eventPolicyMutex
                         );
-                        arrivalPolicy = _eventArrivalPolicy;
+
+                        arrivalPolicy =
+                            _eventArrivalPolicy;
                     }
 
-                    if (arrivalPolicy == PrecisionEventArrivalPolicy::
-                        TriggerImmediateIteration) {
-                        Bump();
-                    } else if (arrivalPolicy == PrecisionEventArrivalPolicy::
-                        ProcessImmediately) {
-                        WakeForWork();
+                    if (
+                        arrivalPolicy ==
+                        PrecisionEventArrivalPolicy::
+                            TriggerImmediateIteration
+                    ) {
+                        this->Bump();
+                    } else if (
+                        arrivalPolicy ==
+                        PrecisionEventArrivalPolicy::
+                            ProcessImmediately
+                    ) {
+                        this->WakeForWork();
                     }
                 }
+
 
                 void OnListenerRegistered(
                     std::type_index eventType
                 ) override {
-                    EventManager::GetInstance()->RegisterReceiver(
-                        eventType, this
-                    );
+                    EventManager::
+                        GetInstance()->
+                        RegisterReceiver(
+                            eventType,
+                            this
+                        );
                 }
+
 
                 void OnListenerUnregistered(
                     std::type_index eventType
                 ) override {
-                    EventManager::GetInstance()->UnregisterReceiver(
-                        eventType, this
-                    );
+                    EventManager::
+                        GetInstance()->
+                        UnregisterReceiver(
+                            eventType,
+                            this
+                        );
                 }
 
+
             public:
-                explicit PrecisionEventThread(
-                    Timing::ISystemClock* clock = nullptr
-                ) : Threads::PrecisionThread(clock),
+                using ClockType =
+                    Timing::
+                        ISystemClock<
+                            typename
+                                PrecisionThreadBase::
+                                    IterationTime
+                        >;
+
+
+                explicit
+                PrecisionEventThread(
+                    ClockType* clock =
+                        nullptr
+                ) :
+                    PrecisionThreadBase(
+                        clock
+                    ),
                     _lifecycleObserverHandle(
-                        RegisterThreadObserver(&_lifecycleObserver)
-                    ) { }
+                        this->
+                            RegisterThreadObserver(
+                                &_lifecycleObserver
+                            )
+                    ) {
+                }
+
 
                 PrecisionEventThread(
                     bool freeOnTerminate,
-                    Timing::ISystemClock* clock = nullptr
-                ) : Threads::PrecisionThread(freeOnTerminate, clock),
+                    ClockType* clock =
+                        nullptr
+                ) :
+                    PrecisionThreadBase(
+                        freeOnTerminate,
+                        clock
+                    ),
                     _lifecycleObserverHandle(
-                        RegisterThreadObserver(&_lifecycleObserver)
-                    ) { }
-
-                ~PrecisionEventThread() override {
-                    Shutdown();
-                    _stopReceivingEvents();
+                        this->
+                            RegisterThreadObserver(
+                                &_lifecycleObserver
+                            )
+                    ) {
                 }
 
-                void Terminate() override {
-                    _stopReceivingEvents();
-                    Threads::PrecisionThread::Terminate();
+
+                ~PrecisionEventThread()
+                    override {
+                    this->Shutdown();
+                    StopReceivingEvents();
                 }
 
-                PrecisionEventProcessOrder GetEventProcessOrder() const {
-                    std::lock_guard<std::mutex> lock(_eventPolicyMutex);
-                    return _eventProcessOrder;
+
+                void Terminate()
+                    override {
+                    StopReceivingEvents();
+                    PrecisionThreadBase::
+                        Terminate();
                 }
+
+
+                PrecisionEventProcessOrder
+                GetEventProcessOrder()
+                    const {
+                    std::lock_guard<
+                        std::mutex
+                    > lock(
+                        _eventPolicyMutex
+                    );
+
+                    return
+                        _eventProcessOrder;
+                }
+
 
                 void SetEventProcessOrder(
-                    PrecisionEventProcessOrder processOrder
+                    PrecisionEventProcessOrder
+                        processOrder
                 ) {
-                    std::lock_guard<std::mutex> lock(_eventPolicyMutex);
-                    _eventProcessOrder = processOrder;
+                    std::lock_guard<
+                        std::mutex
+                    > lock(
+                        _eventPolicyMutex
+                    );
+
+                    _eventProcessOrder =
+                        processOrder;
                 }
 
-                PrecisionEventArrivalPolicy GetEventArrivalPolicy() const {
-                    std::lock_guard<std::mutex> lock(_eventPolicyMutex);
-                    return _eventArrivalPolicy;
+
+                PrecisionEventArrivalPolicy
+                GetEventArrivalPolicy()
+                    const {
+                    std::lock_guard<
+                        std::mutex
+                    > lock(
+                        _eventPolicyMutex
+                    );
+
+                    return
+                        _eventArrivalPolicy;
                 }
+
 
                 void SetEventArrivalPolicy(
-                    PrecisionEventArrivalPolicy arrivalPolicy
+                    PrecisionEventArrivalPolicy
+                        arrivalPolicy
                 ) {
-                    std::lock_guard<std::mutex> lock(_eventPolicyMutex);
-                    _eventArrivalPolicy = arrivalPolicy;
+                    std::lock_guard<
+                        std::mutex
+                    > lock(
+                        _eventPolicyMutex
+                    );
+
+                    _eventArrivalPolicy =
+                        arrivalPolicy;
                 }
         };
 
     }
+
 }
