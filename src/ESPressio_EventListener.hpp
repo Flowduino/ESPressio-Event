@@ -2,11 +2,14 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 #include <typeindex>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include <ESPressio_IObservable.hpp>
 #include <ESPressio_ThreadSafe.hpp>
 #include <ESPressio_TimeTraits.hpp>
 

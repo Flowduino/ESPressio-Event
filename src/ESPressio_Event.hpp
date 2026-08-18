@@ -135,14 +135,33 @@ namespace ESPressio {
 
 
                 void __unref() noexcept override {
-                    if (
-                        _refCount.fetch_sub(
-                            1,
-                            std::memory_order_acq_rel
-                        ) == 1
-                    ) {
-                        delete this;
+                    uint32_t current =
+                        _refCount.load(
+                            std::memory_order_acquire
+                        );
+
+                    while (current != 0) {
+                        if (
+                            _refCount.
+                                compare_exchange_weak(
+                                    current,
+                                    current - 1,
+                                    std::memory_order_acq_rel,
+                                    std::memory_order_acquire
+                                )
+                        ) {
+                            if (current == 1) {
+                                delete this;
+                            }
+
+                            return;
+                        }
                     }
+
+                    /*
+                     * Defensive no-op: an unmatched __unref() must never wrap
+                     * the unsigned reference count to UINT32_MAX.
+                     */
                 }
 
 

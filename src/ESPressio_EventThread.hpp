@@ -1,102 +1,207 @@
 #pragma once
 
 #include <atomic>
+#include <typeindex>
 
 #include <ESPressio_Thread.hpp>
-
 #include <ESPressio_EventThreadBase.hpp>
+
 #include "ESPressio_EventListener.hpp"
 #include "ESPressio_EventManager.hpp"
-
-using namespace ESPressio::Threads;
 
 namespace ESPressio {
 
     namespace Event {
 
         class IEventThread {
-
         };
 
-        class EventThread : public EventThreadBase, public EventListener, public IEventThread {
-            private:
-                std::atomic<bool> _acceptingEvents{true};
 
-                void StopReceivingEvents() noexcept {
-                    if (!_acceptingEvents.exchange(false)) {
+        class EventThread :
+            public EventThreadBase,
+            public EventListener,
+            public IEventThread {
+
+            private:
+                std::atomic<bool>
+                    _acceptingEvents{true};
+
+
+                void StopReceivingEvents()
+                    noexcept {
+                    if (
+                        !_acceptingEvents.
+                            exchange(false)
+                    ) {
                         return;
                     }
+
                     StopAcceptingEvents();
-                    try { UnregisterAllListeners(); } catch (...) { }
+
+                    try {
+                        UnregisterAllListeners();
+                    } catch (...) {
+                    }
+
                     ClearPendingEvents();
                 }
 
+
             protected:
-                inline void OnEvent(IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) override {
+                void OnEvent(
+                    IEvent* event,
+                    EventDispatchMethod dispatchMethod,
+                    EventPriority priority
+                ) override {
                     try {
-                        ProcessEvent(event, dispatchMethod, priority);
+                        ProcessEvent(
+                            event,
+                            dispatchMethod,
+                            priority
+                        );
                     } catch (...) {
                         StopReceivingEvents();
                         throw;
                     }
                 }
 
-                void OnListenerRegistered(std::type_index eventType) override {
-                    EventManager::GetInstance()->RegisterReceiver(eventType, this);
+
+                void OnListenerRegistered(
+                    std::type_index eventType
+                ) override {
+                    EventManager::
+                        GetInstance()->
+                        RegisterReceiver(
+                            eventType,
+                            this
+                        );
                 }
 
-                void OnListenerUnregistered(std::type_index eventType) override {
-                    EventManager::GetInstance()->UnregisterReceiver(eventType, this);
+
+                void OnListenerUnregistered(
+                    std::type_index eventType
+                ) override {
+                    EventManager::
+                        GetInstance()->
+                        UnregisterReceiver(
+                            eventType,
+                            this
+                        );
                 }
+
+
             public:
-                virtual String GetThreadNamePrefix() const { return "eventthread"; }
+                explicit EventThread(
+                    bool freeOnTerminate
+                ) :
+                    EventThreadBase(
+                        freeOnTerminate
+                    ) {
+                }
 
-                EventThread(bool freeOnTerminate) : EventThreadBase(freeOnTerminate) { }
 
-                virtual ~EventThread() {
+                ~EventThread() override {
                     Shutdown();
                     StopReceivingEvents();
                 }
 
-                void Terminate() override {
+
+                void Terminate()
+                    override {
                     StopReceivingEvents();
-                    EventThreadBase::Terminate();
+
+                    EventThreadBase::
+                        Terminate();
                 }
         };
+
 
         enum EventThreadProcessOrder {
             EventsBeforeLoop,
             EventsAfterLoop
         };
 
-        class EventThreadWithLoop : public Thread, public EventReceiver, public IEventThreadBase, public EventListener, public IEventThread {
-            private:
-                EventThreadProcessOrder _processOrder = EventThreadProcessOrder::EventsBeforeLoop;
-                std::atomic<bool> _acceptingEvents{true};
 
-                void StopReceivingEvents() noexcept {
-                    if (!_acceptingEvents.exchange(false)) {
+        class EventThreadWithLoop :
+            public Threads::Thread,
+            public EventReceiver,
+            public IEventThreadBase,
+            public EventListener,
+            public IEventThread {
+
+            private:
+                EventThreadProcessOrder
+                    _processOrder =
+                        EventThreadProcessOrder::
+                            EventsBeforeLoop;
+
+                std::atomic<bool>
+                    _acceptingEvents{true};
+
+
+                void StopReceivingEvents()
+                    noexcept {
+                    if (
+                        !_acceptingEvents.
+                            exchange(false)
+                    ) {
                         return;
                     }
+
                     StopAcceptingEvents();
-                    try { UnregisterAllListeners(); } catch (...) { }
+
+                    try {
+                        UnregisterAllListeners();
+                    } catch (...) {
+                    }
+
                     ClearPendingEvents();
                 }
+
+
             protected:
                 void OnLoop() override {
                     try {
-                        if (_processOrder == EventThreadProcessOrder::EventsBeforeLoop) {
-                            WithEvents([&](IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                                ProcessEvent(event, dispatchMethod, priority);
-                            });
+                        if (
+                            _processOrder ==
+                            EventThreadProcessOrder::
+                                EventsBeforeLoop
+                        ) {
+                            WithEvents(
+                                [&](
+                                    IEvent* event,
+                                    EventDispatchMethod dispatchMethod,
+                                    EventPriority priority
+                                ) {
+                                    ProcessEvent(
+                                        event,
+                                        dispatchMethod,
+                                        priority
+                                    );
+                                }
+                            );
                         }
 
                         OnThreadLoop();
 
-                        if (_processOrder == EventThreadProcessOrder::EventsAfterLoop) {
-                            WithEvents([&](IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                                ProcessEvent(event, dispatchMethod, priority);
-                            });
+                        if (
+                            _processOrder ==
+                            EventThreadProcessOrder::
+                                EventsAfterLoop
+                        ) {
+                            WithEvents(
+                                [&](
+                                    IEvent* event,
+                                    EventDispatchMethod dispatchMethod,
+                                    EventPriority priority
+                                ) {
+                                    ProcessEvent(
+                                        event,
+                                        dispatchMethod,
+                                        priority
+                                    );
+                                }
+                            );
                         }
                     } catch (...) {
                         StopReceivingEvents();
@@ -104,31 +209,74 @@ namespace ESPressio {
                     }
                 }
 
-                virtual void OnThreadLoop() = 0;
 
-                void OnListenerRegistered(std::type_index eventType) override {
-                    EventManager::GetInstance()->RegisterReceiver(eventType, this);
+                virtual void
+                OnThreadLoop() = 0;
+
+
+                void OnListenerRegistered(
+                    std::type_index eventType
+                ) override {
+                    EventManager::
+                        GetInstance()->
+                        RegisterReceiver(
+                            eventType,
+                            this
+                        );
                 }
 
-                void OnListenerUnregistered(std::type_index eventType) override {
-                    EventManager::GetInstance()->UnregisterReceiver(eventType, this);
+
+                void OnListenerUnregistered(
+                    std::type_index eventType
+                ) override {
+                    EventManager::
+                        GetInstance()->
+                        UnregisterReceiver(
+                            eventType,
+                            this
+                        );
                 }
+
+
             public:
-                EventThreadWithLoop(bool freeOnTerminate) : Thread(freeOnTerminate) { }
+                explicit EventThreadWithLoop(
+                    bool freeOnTerminate
+                ) :
+                    Threads::Thread(
+                        freeOnTerminate
+                    ) {
+                }
 
-                virtual ~EventThreadWithLoop() {
+
+                ~EventThreadWithLoop()
+                    override {
                     Shutdown();
                     StopReceivingEvents();
                 }
 
-                void Terminate() override {
+
+                void Terminate()
+                    override {
                     StopReceivingEvents();
-                    Thread::Terminate();
+
+                    Threads::Thread::
+                        Terminate();
                 }
 
-                EventThreadProcessOrder GetProcessOrder() { return _processOrder; }
 
-                void SetProcessOrder(EventThreadProcessOrder processOrder) { _processOrder = processOrder; }
+                EventThreadProcessOrder
+                GetProcessOrder() const {
+                    return _processOrder;
+                }
+
+
+                void SetProcessOrder(
+                    EventThreadProcessOrder
+                        processOrder
+                ) {
+                    _processOrder =
+                        processOrder;
+                }
         };
 
     }

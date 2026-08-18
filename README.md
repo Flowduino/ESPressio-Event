@@ -4,9 +4,9 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 
 ESPressio Event provides asynchronous typed Event routing, Event-aware Threads, bounded receiver queues, listener/observer registration, priority dispatch, and high-resolution Event timing for ESP32 applications.
 
-## Version 5.0.0
+## Version 5.0.1
 
-Version `5.0.0` is a major architectural release aligned with:
+Version `5.0.1` is the first corrective patch for the 5.x architecture introduced in 5.0.0 aligned with:
 
 ```text
 ESPressio Threads >= 3.0.0
@@ -16,6 +16,24 @@ ESPressio Observable >= 3.0.0
 Timing 2.x and ESPressio Units are provided transitively through ESPressio Threads.
 
 This release removes the remaining Timing 1.x assumptions from Event and adds optional ESPressio Serializable Event support without making ESPressio Serializable a mandatory dependency.
+
+
+### 5.0.1 corrective fixes
+
+This patch release resolves several defects discovered after the initial 5.0.0 release:
+
+- fixes `ESPressio_EventListener.hpp` compilation by explicitly including the Observable exception declaration and its direct standard-library dependencies;
+- neutralizes the obsolete `ESPressio_EventListener.cpp` template definitions which no longer matched the header API;
+- removes the obsolete Arduino `String GetThreadNamePrefix()` API from `EventThread`;
+- removes public-header namespace pollution from the corrected Event Thread and enum headers;
+- fixes `EventListenerInterest` increment/decrement wrap-around to use its actual three enum values;
+- hardens Event reference counting against unmatched `__unref()` underflow;
+- prevents EventDispatcher from creating empty receiver buckets for unhandled Event types;
+- removes raw heap allocation for dispatcher receiver buckets;
+- avoids invoking receiver code while holding the EventDispatcher receiver-map mutex;
+- removes empty receiver buckets when the last receiver unregisters.
+
+The Event 5.x generic Timing/Threads architecture and optional Serializable Event design remain unchanged.
 
 ## Compatibility
 
@@ -36,7 +54,7 @@ Normal Event applications require only the dependencies declared by the library:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.0.0
+    flowduino/ESPressio-Event@^5.0.1
 ```
 
 The mandatory dependency graph is:
@@ -222,7 +240,7 @@ A consuming application which uses Serializable Events declares:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.0.0
+    flowduino/ESPressio-Event@^5.0.1
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 

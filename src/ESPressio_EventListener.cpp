@@ -1,29 +1,10 @@
 #include "ESPressio_EventListener.hpp"
 
-#include <functional>
-
-namespace ESPressio {
-
-    namespace Event {
-
-        template <typename EventType>
-        EventListenerHandlePtr IEventListener::RegisterListener(
-            std::function<void(
-                IEvent*,
-                EventDispatchMethod dispatchMethod,
-                EventPriority priority)> callback,
-                EventListenerInterest interest,
-                EventTime maximumTimeSinceDispatch,
-                std::function<bool(IEvent*)> customInterestCallback
-        ) {
-            return RegisterListener(typeid(EventType), callback, interest, maximumTimeSinceDispatch, customInterestCallback);
-        }
-
-        template <typename EventType>
-        void IEventListener::UnregisterListener(IEventListenerHandle* handler) {
-            UnregisterListener(typeid(EventType), handler);
-        }
-
-    }
-
-}
+/*
+ * ESPressio Event 5.0.1
+ *
+ * EventListener template members are defined in ESPressio_EventListener.hpp.
+ * The old 5.0.0 out-of-line template definitions were stale and did not match
+ * the declarations. This intentionally-empty translation unit is retained so
+ * an upgrade can be performed simply by overwriting the repository.
+ */
