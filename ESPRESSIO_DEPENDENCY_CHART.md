@@ -143,7 +143,7 @@ The synchronous Observer layer also provides the source notifications consumed b
 
 **Required ESPressio dependencies:**
 
-- ESPressio Timing >= 2.2.0 < 3.0.0;
+- ESPressio Timing >= 2.2.1 < 3.0.0;
 - ESPressio Observable >= 3.0.0 < 4.0.0.
 
 ### ESPressio Threads → ESPressio Timing — required
@@ -168,7 +168,7 @@ ESPressio Event can optionally bridge them into asynchronous Events, but Threads
 
 **Required ESPressio dependencies:**
 
-- ESPressio Timing >= 2.2.0 < 3.0.0.
+- ESPressio Timing >= 2.2.1 < 3.0.0.
 
 ### ESPressio ESP-Now → ESPressio Timing — required
 
@@ -194,9 +194,9 @@ When `ESPNowEventTransport` is selected, the application also acquires the Seria
 
 **Required ESPressio dependencies:**
 
-- ESPressio Threads >= 3.1.0 < 4.0.0;
+- ESPressio Threads >= 3.1.1 < 4.0.0;
 - ESPressio Observable >= 3.0.0 < 4.0.0;
-- ESPressio Timing >= 2.2.0 < 3.0.0.
+- ESPressio Timing >= 2.2.1 < 3.0.0.
 
 Event currently sits at the deepest point in the core ESPressio dependency hierarchy represented here.
 

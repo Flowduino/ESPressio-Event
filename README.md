@@ -12,7 +12,7 @@ optional transport-neutral Serializable Event routing.
 
 ## Latest Stable Version
 
-The latest stable version is **5.5.0**.
+The latest stable version is **5.6.2**.
 
 For release-by-release history, see [CHANGELOG.md](CHANGELOG.md).
 
@@ -67,7 +67,7 @@ ESPressio Event follows those principles by making the Event itself the
 shared data contract while keeping Event producers and Event consumers
 independent of one another.
 
-## Runtime Serializable Event Discovery and Construction (5.6.1)
+## Runtime Serializable Event Discovery and Construction (5.6.0)
 
 ESPressio Event 5.6.0 exposes the Serializable Event registry as a safe runtime API. This is intended for operator consoles, REST/WebSocket gateways, test harnesses, Event replay, and other systems that discover Event types by stable wire identity rather than by C++ template type.
 
@@ -210,13 +210,13 @@ lib_deps =
 The mandatory dependency graph is:
 
 ``` text
-ESPressio Event 5.4
+ESPressio Event 5.6.2
     |
-    +-- ESPressio Threads >= 3.1.0 < 4.0.0
+    +-- ESPressio Threads >= 3.1.1 < 4.0.0
     |
     +-- ESPressio Observable >= 3.0.0 < 4.0.0
     |
-    +-- ESPressio Timing >= 2.2.0 < 3.0.0
+    +-- ESPressio Timing >= 2.2.1 < 3.0.0
 ```
 
 ESPressio Units is available through the Timing dependency stack.
