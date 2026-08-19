@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 
 ESPressio Event provides asynchronous typed Event routing, Event-aware Threads, bounded receiver queues, listener/observer registration, priority dispatch, and high-resolution Event timing for ESP32 applications.
 
-## Version 5.1.0
+## Version 5.2.0
 
 Version `5.1.0` extends the 5.x architecture with opt-in System Clock Observer-to-Event bridging, aligned with:
 
@@ -19,6 +19,63 @@ Timing 2.2 is now also declared directly because the optional System Clock Event
 Serializable Event support remains optional: ordinary Event and Timing Event bridge users do not acquire an ESPressio Serializable dependency.
 
 
+
+
+### 5.2.0 ESPressio Threads infrastructure Event bridges
+
+Version `5.2.0` adds opt-in bridges from the singleton infrastructure Observer APIs introduced by ESPressio Threads `3.1.0` into asynchronous ESPressio Events.
+
+Three ordinary singleton bridges are provided:
+
+```cpp
+ThreadManagerEventBridge
+ThreadGarbageCollectorEventBridge
+ThreadTerminationDispatcherEventBridge
+```
+
+and three opt-in Serializable counterparts:
+
+```cpp
+SerializableThreadManagerEventBridge
+SerializableThreadGarbageCollectorEventBridge
+SerializableThreadTerminationDispatcherEventBridge
+```
+
+Thread-specific Events are grouped beneath:
+
+```text
+src/thread-events/
+```
+
+with batch headers:
+
+```cpp
+#include <ESPressio_ThreadEvents.hpp>
+#include <ESPressio_ThreadEvents_Serializable.hpp>
+```
+
+Bridge batch headers are also available:
+
+```cpp
+#include <ESPressio_ThreadEventBridges.hpp>
+#include <ESPressio_ThreadEventBridges_Serializable.hpp>
+```
+
+All bridges remain dormant until explicitly initialized:
+
+```cpp
+Event::ThreadManagerEventBridge::GetInstance().Initialize();
+Event::ThreadGarbageCollectorEventBridge::GetInstance().Initialize();
+Event::ThreadTerminationDispatcherEventBridge::GetInstance().Initialize();
+```
+
+Each bridge converts the corresponding synchronous Threads Observer callback into a queued asynchronous Event.
+
+The Event payloads use immutable Threads snapshots/results. Raw `IThread*` values are deliberately not retained as asynchronous object references. The registration-failure Event records only the numeric address for local diagnostic correlation.
+
+Serializable counterparts flatten Thread state, cleanup results, garbage-collection results, and execution modes into stable primitive schema fields. `std::exception_ptr` values are represented by portable exception-message strings.
+
+ESPressio Serializable remains an optional dependency. Ordinary Thread Events and ordinary Thread Event Bridges do not include or require it.
 
 ### 5.1.0 Timing Event bridge
 
@@ -89,7 +146,7 @@ Normal Event applications require only the dependencies declared by the library:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.1.0
+    flowduino/ESPressio-Event@^5.2.0
 ```
 
 The mandatory dependency graph is:
@@ -275,7 +332,7 @@ A consuming application which uses Serializable Events declares:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.1.0
+    flowduino/ESPressio-Event@^5.2.0
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 
