@@ -85,6 +85,22 @@ struct EventDispatchContext {
     EventOrigin Origin = EventOrigin::Local;
     uint64_t TransportMessageID = 0;
     uint8_t HopCount = 0;
+
+    constexpr bool operator==(
+        const EventDispatchContext& other
+    ) const noexcept {
+        return
+            Origin == other.Origin &&
+            TransportMessageID ==
+                other.TransportMessageID &&
+            HopCount == other.HopCount;
+    }
+
+    constexpr bool operator!=(
+        const EventDispatchContext& other
+    ) const noexcept {
+        return !(*this == other);
+    }
 };
 
 #pragma pack(push, 1)

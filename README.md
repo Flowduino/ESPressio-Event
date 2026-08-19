@@ -67,7 +67,7 @@ ESPressio Event follows those principles by making the Event itself the
 shared data contract while keeping Event producers and Event consumers
 independent of one another.
 
-## Runtime Serializable Event Discovery and Construction (5.6.0)
+## Runtime Serializable Event Discovery and Construction (5.6.1)
 
 ESPressio Event 5.6.0 exposes the Serializable Event registry as a safe runtime API. This is intended for operator consoles, REST/WebSocket gateways, test harnesses, Event replay, and other systems that discover Event types by stable wire identity rather than by C++ template type.
 
@@ -1600,3 +1600,18 @@ unchanged:
 > acquiring direct relationships with one another.**
 
 That is the purpose of ESPressio Event.
+
+## ESPressio Threads 3.1 compatibility
+
+Version 5.6.1 defines explicit equality semantics for `EventDispatchContext`, allowing the context to participate correctly in ESPressio Threads 3.1 `ReadWriteMutex<T>` change detection.
+
+Two contexts are equal only when all dispatch identity fields match:
+
+```text
+Origin
+TransportMessageID
+HopCount
+```
+
+This is a compatibility fix only; Event dispatch behaviour and public Event Transport semantics are unchanged.
+

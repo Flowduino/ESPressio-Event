@@ -12,6 +12,20 @@ Versioning](https://semver.org/).
 > had little or no release-note detail, the entry is intentionally terse
 > rather than inferring unsupported intent.
 
+## [5.6.1] - 2026-08-19
+
+### Fixed
+
+- Added explicit C++17 equality semantics to `EventDispatchContext`.
+- Fixed compilation when `EventDispatchContext` is used with ESPressio Threads 3.1 `ReadWriteMutex<T>` change detection, whose default comparator requires `T` to support `operator==`.
+- Equality now compares the complete dispatch-context identity: `Origin`, `TransportMessageID`, and `HopCount`.
+- Added regression coverage for equal contexts and for differences in each individual context field.
+
+### Compatibility
+
+- This is a backward-compatible patch release.
+- No existing Event, listener, Observer, Event Transport, runtime Serializable Event, or Event Bridge interfaces were removed or changed.
+
 ## [5.6.0] - 2026-08-19
 
 ### Added
