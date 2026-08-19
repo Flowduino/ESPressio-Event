@@ -78,6 +78,14 @@ namespace ESPressio {
 
 
             protected:
+                virtual void OnEventDispatched(
+                    IEvent*,
+                    EventDispatchMethod,
+                    EventPriority
+                ) {
+                }
+
+
                 void ClearEventReceivers() {
                     std::lock_guard<
                         std::mutex
@@ -97,6 +105,14 @@ namespace ESPressio {
                                 dispatchMethod,
                             EventPriority priority
                         ) {
+                            event->__dispatch();
+
+                            OnEventDispatched(
+                                event,
+                                dispatchMethod,
+                                priority
+                            );
+
                             const auto receivers =
                                 GetEventTypeBucketSnapshot(
                                     std::type_index(

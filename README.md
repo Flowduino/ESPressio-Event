@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 
 ESPressio Event provides asynchronous typed Event routing, Event-aware Threads, bounded receiver queues, listener/observer registration, priority dispatch, and high-resolution Event timing for ESP32 applications.
 
-## Version 5.2.0
+## Version 5.3.0
 
 Version `5.1.0` extends the 5.x architecture with opt-in System Clock Observer-to-Event bridging, aligned with:
 
@@ -20,6 +20,147 @@ Serializable Event support remains optional: ordinary Event and Timing Event bri
 
 
 
+
+
+### 5.3.0 transport-neutral Serializable Event routing
+
+Version `5.3.0` introduces `EventTransportManager`, a transport-neutral bidirectional routing layer for Serializable Events.
+
+Transport implementations remain outside ESPressio Event. A concrete transport implements only:
+
+```cpp
+IEventTransport
+```
+
+while Event owns type registration, Binary serialization/deserialization, stable wire identities, inbound/outbound permissions, dispatch metadata, pending-work lifecycle, and remote-to-local loop prevention.
+
+The transport subsystem is opt-in:
+
+```cpp
+#include <ESPressio_EventTransport.hpp>
+```
+
+and therefore ESPressio Serializable remains optional for applications that do not use Event Transport.
+
+#### Stable Event type identity
+
+Every transported Event type declares a stable wire name once:
+
+```cpp
+ESPRESSIO_EVENT_TRANSPORT_TYPE(
+    MySerializableEvent,
+    "com.example.my-event.v1"
+)
+```
+
+The name is converted to a defined 64-bit FNV-1a identifier. RTTI names and `typeid().hash_code()` are deliberately not used as wire contracts.
+
+#### Direction registration
+
+```cpp
+manager.RegisterInboundEvent<A>();
+manager.RegisterOutboundEvent<B>();
+manager.RegisterBidirectionalEvent<C>();
+```
+
+C++17 variadic bulk forms register multiple types in one call:
+
+```cpp
+manager.RegisterInboundEvents<A, B, C>();
+manager.RegisterOutboundEvents<D, E>();
+manager.RegisterBidirectionalEvents<F, G, H>();
+```
+
+Generic direction-selecting forms are also available:
+
+```cpp
+manager.RegisterEvent<A>(EventTransportDirection::Inbound);
+manager.RegisterEvents<A, B, C>(EventTransportDirection::Bidirectional);
+```
+
+Registration permissions merge idempotently. Registering Inbound and later Outbound results in Bidirectional registration.
+
+Inbound-capable Events must be default constructible because the manager must create them from received payloads. Outbound-only registration does not impose this requirement.
+
+#### Dynamic unregistration and pending-work policy
+
+Unregistration mirrors registration, including variadic bulk methods:
+
+```cpp
+manager.UnregisterOutboundEvents<A, B>();
+manager.UnregisterInboundEvents<C, D>();
+manager.UnregisterBidirectionalEvents<E, F>();
+```
+
+Direction removal subtracts only that permission. Removing Outbound from a Bidirectional type leaves it Inbound.
+
+Already-accepted work is controlled independently:
+
+```cpp
+EventTransportUnregistrationOptions options;
+options.PendingOutbound = EventTransportPendingAction::Complete;
+options.PendingInbound  = EventTransportPendingAction::Discard;
+
+manager.UnregisterBidirectionalEvent<MyEvent>(options);
+```
+
+`Complete` drains work already owned by `EventTransportManager`; `Discard` removes it. In either case, new matching work is rejected immediately after unregistration.
+
+Global helpers are also provided:
+
+```cpp
+UnregisterAllEvents(...)
+UnregisterAllInboundEvents(...)
+UnregisterAllOutboundEvents(...)
+UnregisterAllBidirectionalEvents(...)
+```
+
+#### Pending ownership boundary
+
+Outbound work is pending only until it is handed to `IEventTransport::Send()`. Once a transport accepts it, further cancellation is transport-specific.
+
+Inbound work is pending only until it has been deserialized and submitted to the local Event system.
+
+#### Remote origin and loop prevention
+
+`EventDispatchContext` records whether an Event originated locally or remotely plus the transport message ID and hop count.
+
+Locally originated registered Events may be sent outbound. Remotely received Events are dispatched normally to local listeners but are **not retransmitted by default**, preventing A → B → A Event loops.
+
+#### Wire format
+
+The version-1 Event Transport envelope preserves:
+
+```text
+stable Event type ID
+Serializable schema version
+message ID
+dispatch method
+priority
+hop count
+payload length
+```
+
+The payload uses ESPressio Serializable `BinaryArchive` in this release.
+
+#### Multiple transports
+
+Multiple `IEventTransport` implementations can be registered simultaneously:
+
+```cpp
+manager.RegisterTransport(&espNowTransport);
+manager.RegisterTransport(&udpTransport);
+```
+
+Outbound transportable Events are handed to every currently registered transport. Incoming packets from any registered transport enter the same type registry and local Event dispatch path.
+
+#### EventTransportManager observation
+
+`EventTransportManager` itself exposes an `IEventTransportManagerObserver` surface for transport/type-registration and inbound/outbound lifecycle diagnostics. Observer callbacks are exception-isolated and do not alter routing behavior.
+
+#### Loopback example
+
+`examples/EventTransportLoopback/` provides a transport implementation that immediately feeds transmitted bytes back into the manager receive path. It is intended to exercise the transport-independent architecture before a physical ESP-NOW, UDP, or other adapter is available.
 
 ### 5.2.0 ESPressio Threads infrastructure Event bridges
 
@@ -146,7 +287,7 @@ Normal Event applications require only the dependencies declared by the library:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.2.0
+    flowduino/ESPressio-Event@^5.3.0
 ```
 
 The mandatory dependency graph is:
@@ -332,7 +473,7 @@ A consuming application which uses Serializable Events declares:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.2.0
+    flowduino/ESPressio-Event@^5.3.0
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 

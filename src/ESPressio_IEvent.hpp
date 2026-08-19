@@ -5,6 +5,7 @@
 #include <ESPressio_ClockTypes.hpp>
 
 #include "ESPressio_EventEnums.hpp"
+#include "ESPressio_EventTransportTypes.hpp"
 
 namespace ESPressio {
 
@@ -33,6 +34,8 @@ namespace ESPressio {
                 virtual void __ref() noexcept = 0;
                 virtual void __unref() noexcept = 0;
                 virtual void __dispatch() = 0;
+                virtual void __setDispatchContext(const EventDispatchContext& context) = 0;
+                virtual EventDispatchContext __getDispatchContext() const = 0;
 
                 // Client Methods
                 virtual void Queue(

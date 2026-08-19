@@ -54,6 +54,9 @@ namespace ESPressio {
                 std::atomic<uint32_t>
                     _refCount{0};
 
+                mutable Threads::ReadWriteMutex<EventDispatchContext>
+                    _dispatchContext{EventDispatchContext()};
+
 
                 static uint64_t
                 GetResolutionNanoseconds() {
@@ -162,6 +165,29 @@ namespace ESPressio {
                      * Defensive no-op: an unmatched __unref() must never wrap
                      * the unsigned reference count to UINT32_MAX.
                      */
+                }
+
+
+                void __setDispatchContext(
+                    const EventDispatchContext& context
+                ) override {
+                    _dispatchContext.WithWriteLock(
+                        [&](EventDispatchContext& current) {
+                            current = context;
+                        }
+                    );
+                }
+
+
+                EventDispatchContext
+                __getDispatchContext() const override {
+                    EventDispatchContext result;
+                    _dispatchContext.WithSharedReadLock(
+                        [&](const EventDispatchContext& current) {
+                            result = current;
+                        }
+                    );
+                    return result;
                 }
 
 
