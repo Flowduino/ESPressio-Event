@@ -1,439 +1,275 @@
 # ESPressio Event
 
-Event-Driven Observer Pattern Components of the Flowduino ESPressio Development Platform.
+Event-Driven Observer Pattern components of the Flowduino ESPressio
+Development Platform.
 
-ESPressio Event provides asynchronous typed Event routing, Event-aware Threads, bounded receiver queues, listener/observer registration, priority dispatch, and high-resolution Event timing for ESP32 applications.
+ESPressio Event provides a foundation for designing, structuring, and
+implementing ESP32 applications using Event-Driven Development (EDD):
+asynchronous typed Event routing, Event-aware Threads, bounded receiver
+queues, listener/observer registration, priority dispatch,
+high-resolution Event timing, optional Observer-to-Event bridges, and
+optional transport-neutral Serializable Event routing.
+
+## Latest Stable Version
+
+The latest stable version is **5.4.0**.
+
+## Compatibility
+
+ESPressio Event targets the **ESP32 family** using Arduino-ESP32.
+
+The implementation uses ESP-IDF FreeRTOS facilities, C++ RTTI,
+`std::shared_mutex`, and Arduino APIs through its dependency stack.
+
+RTTI must be enabled:
+
+``` ini
+build_unflags =
+    -fno-rtti
+```
+
+Compatibility should still be verified by compiling for the intended
+ESP32 board/core/toolchain combination.
+
+## ESPressio Development Platform
+
+The **ESPressio Development Platform** is a collection of discrete,
+sometimes interconnected component libraries developed around a common
+design ethos.
+
+The principal objectives are:
+
+-   **Light-weight** --- components should strive to minimise memory
+    consumption and operational overhead without sacrificing clarity or
+    correctness.
+-   **Ease of Use** --- ESPressio components frequently provide
+    developer-friendly, strongly typed abstractions over lower-level
+    procedural facilities.
+-   **Object-Oriented** --- a type for everything, and everything in a
+    type.
+-   **SOLID** --- to the maximum extent practical within C++, Arduino,
+    FreeRTOS, and microcontroller constraints:
+    -   **Single Responsibility Principle (SRP)** --- keep components
+        small and focused.
+    -   **Open/Closed Principle (OCP)** --- prefer extension without
+        modification.
+    -   **Liskov Substitution Principle (LSP)** --- derived
+        implementations should remain substitutable for their
+        abstractions.
+    -   **Interface Segregation Principle (ISP)** --- prefer focused,
+        client-specific interfaces.
+    -   **Dependency Inversion Principle (DIP)** --- depend upon
+        abstractions rather than concrete implementations.
+
+ESPressio Event follows those principles by making the Event itself the
+shared data contract while keeping Event producers and Event consumers
+independent of one another.
+
+## License
+
+ESPressio and its component libraries are licensed under the **Apache
+License 2.0**.
+
+See [LICENSE](LICENSE) for details.
+
+## Namespace
+
+The Event API resides beneath:
+
+``` cpp
+ESPressio::Event
+```
 
 ## ESPressio Library Dependencies
 
-ESPressio is designed as a modular ecosystem of independently useful libraries, with required dependencies kept explicit and optional integrations introduced only when the corresponding functionality is selected.
+ESPressio is designed as a modular ecosystem of independently useful
+libraries, with required dependencies kept explicit and optional
+integrations introduced only when the corresponding functionality is
+selected.
 
-For a complete overview of the relationships between ESPressio libraries—including required dependencies, opt-in dependencies, and the overall dependency hierarchy—see:
+For a complete overview of required and opt-in relationships, see:
 
 **[ESPressio Library Dependency Chart](ESPRESSIO_DEPENDENCY_CHART.md)**
 
 In the dependency chart:
 
-- **Solid relationships** represent required ESPressio library dependencies.
-- **Dashed relationships** represent opt-in dependencies that are introduced only when the corresponding feature, integration, type, or header is used.
+-   **Solid relationships** represent required ESPressio dependencies.
+-   **Dashed relationships** represent opt-in dependencies introduced
+    only when the corresponding feature, integration, type, or header is
+    used.
 
-## Version 5.4.0
+### Required dependencies
 
-Version `5.1.0` extends the 5.x architecture with opt-in System Clock Observer-to-Event bridging, aligned with:
+Normal Event applications require only the dependencies declared by the
+library:
 
-```text
-ESPressio Threads >= 3.0.0
-ESPressio Observable >= 3.0.0
-ESPressio Timing >= 2.2.0
-```
-
-Timing 2.2 is now also declared directly because the optional System Clock Event bridge compiles against its public Observer API. ESPressio Units remains available transitively through the dependency stack.
-
-Serializable Event support remains optional: ordinary Event and Timing Event bridge users do not acquire an ESPressio Serializable dependency.
-
-
-
-
-
-
-### 5.4.0 per-transport Event routing policy
-
-Version `5.4.0` extends `EventTransportManager` with transport-scoped Event routing.
-
-The global registration API introduced in 5.3 remains unchanged and acts as the default policy for every registered concrete transport:
-
-```cpp
-manager.RegisterOutboundEvent<TelemetryEvent>();
-manager.RegisterInboundEvent<RemoteCommandEvent>();
-manager.RegisterBidirectionalEvent<SharedStateEvent>();
-```
-
-Applications can now establish an explicit route for one concrete transport:
-
-```cpp
-manager.RegisterOutboundEvent<TelemetryEvent>(
-    &udpTransport
-);
-
-manager.RegisterBidirectionalEvent<SharedStateEvent>(
-    &espNowTransport
-);
-```
-
-C++17 variadic bulk forms are also provided:
-
-```cpp
-manager.RegisterOutboundEvents<
-    TelemetryEvent,
-    DiagnosticsEvent,
-    BatteryStatusEvent
->(
-    &udpTransport
-);
-```
-
-The route model uses:
-
-```text
-global/default direction
-        +
-optional per-transport override
-```
-
-A transport-specific override is authoritative for that transport, including `EventTransportDirection::None`.
-
-This means a globally bidirectional Event can be selectively made inbound-only, outbound-only, or fully disabled on one transport without altering the policy for any other transport.
-
-Transport-specific registration deliberately creates an explicit override even when the global default already permits the requested direction. The scoped policy therefore remains stable if the global policy later changes.
-
-Transport-scoped unregistration mirrors registration:
-
-```cpp
-manager.UnregisterOutboundEvent<TelemetryEvent>(
-    &udpTransport,
-    options
-);
-
-manager.UnregisterInboundEvents<
-    CommandA,
-    CommandB
->(
-    &espNowTransport,
-    options
-);
-```
-
-Pending-work policy is also scoped to the selected transport. `Discard` removes only matching pending work for that Event type and transport; work belonging to other concrete transports is unaffected.
-
-Global unregistration changes only the default direction. Existing per-transport overrides are intentionally preserved.
-
-For example:
-
-```text
-SharedStateEvent:
-    global default = Bidirectional
-
-    ESP-NOW override = Bidirectional
-    UDP override     = Outbound
-    Serial override  = None
-```
-
-A later global:
-
-```cpp
-manager.UnregisterOutboundEvent<SharedStateEvent>();
-```
-
-changes the default for transports without overrides while leaving the three explicit routes above intact.
-
-Outbound dispatch now creates one pending work item per eligible transport. This allows transport-specific pending cancellation while retaining one logical transport message ID across all fan-out copies of the same local Event.
-
-Inbound permission is evaluated against the concrete transport that supplied the packet.
-
-The active default/effective policy can be queried using:
-
-```cpp
-manager.GetEventTransportDirection<MyEvent>();
-
-manager.GetEventTransportDirection<MyEvent>(
-    &espNowTransport
-);
-```
-
-The first returns the global/default direction. The second returns the effective direction for the selected concrete transport after applying any explicit override.
-
-The transport-manager Observer surface now also exposes transport-scoped route lifecycle notifications and per-transport outbound acceptance notifications.
-
-### 5.3.0 transport-neutral Serializable Event routing
-
-Version `5.3.0` introduces `EventTransportManager`, a transport-neutral bidirectional routing layer for Serializable Events.
-
-Transport implementations remain outside ESPressio Event. A concrete transport implements only:
-
-```cpp
-IEventTransport
-```
-
-while Event owns type registration, Binary serialization/deserialization, stable wire identities, inbound/outbound permissions, dispatch metadata, pending-work lifecycle, and remote-to-local loop prevention.
-
-The transport subsystem is opt-in:
-
-```cpp
-#include <ESPressio_EventTransport.hpp>
-```
-
-and therefore ESPressio Serializable remains optional for applications that do not use Event Transport.
-
-#### Stable Event type identity
-
-Every transported Event type declares a stable wire name once:
-
-```cpp
-ESPRESSIO_EVENT_TRANSPORT_TYPE(
-    MySerializableEvent,
-    "com.example.my-event.v1"
-)
-```
-
-The name is converted to a defined 64-bit FNV-1a identifier. RTTI names and `typeid().hash_code()` are deliberately not used as wire contracts.
-
-#### Direction registration
-
-```cpp
-manager.RegisterInboundEvent<A>();
-manager.RegisterOutboundEvent<B>();
-manager.RegisterBidirectionalEvent<C>();
-```
-
-C++17 variadic bulk forms register multiple types in one call:
-
-```cpp
-manager.RegisterInboundEvents<A, B, C>();
-manager.RegisterOutboundEvents<D, E>();
-manager.RegisterBidirectionalEvents<F, G, H>();
-```
-
-Generic direction-selecting forms are also available:
-
-```cpp
-manager.RegisterEvent<A>(EventTransportDirection::Inbound);
-manager.RegisterEvents<A, B, C>(EventTransportDirection::Bidirectional);
-```
-
-Registration permissions merge idempotently. Registering Inbound and later Outbound results in Bidirectional registration.
-
-Inbound-capable Events must be default constructible because the manager must create them from received payloads. Outbound-only registration does not impose this requirement.
-
-#### Dynamic unregistration and pending-work policy
-
-Unregistration mirrors registration, including variadic bulk methods:
-
-```cpp
-manager.UnregisterOutboundEvents<A, B>();
-manager.UnregisterInboundEvents<C, D>();
-manager.UnregisterBidirectionalEvents<E, F>();
-```
-
-Direction removal subtracts only that permission. Removing Outbound from a Bidirectional type leaves it Inbound.
-
-Already-accepted work is controlled independently:
-
-```cpp
-EventTransportUnregistrationOptions options;
-options.PendingOutbound = EventTransportPendingAction::Complete;
-options.PendingInbound  = EventTransportPendingAction::Discard;
-
-manager.UnregisterBidirectionalEvent<MyEvent>(options);
-```
-
-`Complete` drains work already owned by `EventTransportManager`; `Discard` removes it. In either case, new matching work is rejected immediately after unregistration.
-
-Global helpers are also provided:
-
-```cpp
-UnregisterAllEvents(...)
-UnregisterAllInboundEvents(...)
-UnregisterAllOutboundEvents(...)
-UnregisterAllBidirectionalEvents(...)
-```
-
-#### Pending ownership boundary
-
-Outbound work is pending only until it is handed to `IEventTransport::Send()`. Once a transport accepts it, further cancellation is transport-specific.
-
-Inbound work is pending only until it has been deserialized and submitted to the local Event system.
-
-#### Remote origin and loop prevention
-
-`EventDispatchContext` records whether an Event originated locally or remotely plus the transport message ID and hop count.
-
-Locally originated registered Events may be sent outbound. Remotely received Events are dispatched normally to local listeners but are **not retransmitted by default**, preventing A → B → A Event loops.
-
-#### Wire format
-
-The version-1 Event Transport envelope preserves:
-
-```text
-stable Event type ID
-Serializable schema version
-message ID
-dispatch method
-priority
-hop count
-payload length
-```
-
-The payload uses ESPressio Serializable `BinaryArchive` in this release.
-
-#### Multiple transports
-
-Multiple `IEventTransport` implementations can be registered simultaneously:
-
-```cpp
-manager.RegisterTransport(&espNowTransport);
-manager.RegisterTransport(&udpTransport);
-```
-
-Outbound transportable Events are handed to every currently registered transport. Incoming packets from any registered transport enter the same type registry and local Event dispatch path.
-
-#### EventTransportManager observation
-
-`EventTransportManager` itself exposes an `IEventTransportManagerObserver` surface for transport/type-registration and inbound/outbound lifecycle diagnostics. Observer callbacks are exception-isolated and do not alter routing behavior.
-
-#### Loopback example
-
-`examples/EventTransportLoopback/` provides a transport implementation that immediately feeds transmitted bytes back into the manager receive path. It is intended to exercise the transport-independent architecture before a physical ESP-NOW, UDP, or other adapter is available.
-
-### 5.2.0 ESPressio Threads infrastructure Event bridges
-
-Version `5.2.0` adds opt-in bridges from the singleton infrastructure Observer APIs introduced by ESPressio Threads `3.1.0` into asynchronous ESPressio Events.
-
-Three ordinary singleton bridges are provided:
-
-```cpp
-ThreadManagerEventBridge
-ThreadGarbageCollectorEventBridge
-ThreadTerminationDispatcherEventBridge
-```
-
-and three opt-in Serializable counterparts:
-
-```cpp
-SerializableThreadManagerEventBridge
-SerializableThreadGarbageCollectorEventBridge
-SerializableThreadTerminationDispatcherEventBridge
-```
-
-Thread-specific Events are grouped beneath:
-
-```text
-src/thread-events/
-```
-
-with batch headers:
-
-```cpp
-#include <ESPressio_ThreadEvents.hpp>
-#include <ESPressio_ThreadEvents_Serializable.hpp>
-```
-
-Bridge batch headers are also available:
-
-```cpp
-#include <ESPressio_ThreadEventBridges.hpp>
-#include <ESPressio_ThreadEventBridges_Serializable.hpp>
-```
-
-All bridges remain dormant until explicitly initialized:
-
-```cpp
-Event::ThreadManagerEventBridge::GetInstance().Initialize();
-Event::ThreadGarbageCollectorEventBridge::GetInstance().Initialize();
-Event::ThreadTerminationDispatcherEventBridge::GetInstance().Initialize();
-```
-
-Each bridge converts the corresponding synchronous Threads Observer callback into a queued asynchronous Event.
-
-The Event payloads use immutable Threads snapshots/results. Raw `IThread*` values are deliberately not retained as asynchronous object references. The registration-failure Event records only the numeric address for local diagnostic correlation.
-
-Serializable counterparts flatten Thread state, cleanup results, garbage-collection results, and execution modes into stable primitive schema fields. `std::exception_ptr` values are represented by portable exception-message strings.
-
-ESPressio Serializable remains an optional dependency. Ordinary Thread Events and ordinary Thread Event Bridges do not include or require it.
-
-### 5.1.0 Timing Event bridge
-
-Version `5.1.0` adds an explicit bridge from ESPressio Timing 2.2 System Clock Observer notifications into asynchronous ESPressio Events.
-
-The ordinary bridge is opt-in:
-
-```cpp
-#include <ESPressio_SystemClockEventBridge.hpp>
-
-Event::SystemClockEventBridge::GetInstance().Initialize();
-```
-
-Timing Events are grouped under `src/timing-events/` and batch-imported by:
-
-```cpp
-#include <ESPressio_TimingEvents.hpp>
-```
-
-Every `ISystemClockObserver` callback has a corresponding strongly typed Event carrying the callback snapshot, including synchronization before/after values, immediate clock difference, synchronization result/status, state changes, configuration changes, and callback lifecycle information.
-
-Serializable counterparts are also provided without making ESPressio Serializable a mandatory dependency:
-
-```cpp
-#include <ESPressio_TimingEvents_Serializable.hpp>
-#include <ESPressio_SystemClockEventBridge_Serializable.hpp>
-
-Event::SerializableSystemClockEventBridge::GetInstance().Initialize();
-```
-
-Serializable timing Events flatten Timing synchronization/configuration structures into stable primitive payload fields. `std::exception_ptr` is deliberately converted to a portable exception-message string in the Serializable callback-failure Event.
-
-Both bridges are dormant until `Initialize()` is explicitly called, and `Shutdown()` releases the retained Observable registration handle.
-
-### 5.0.1 corrective fixes
-
-This patch release resolves several defects discovered after the initial 5.0.0 release:
-
-- fixes `ESPressio_EventListener.hpp` compilation by explicitly including the Observable exception declaration and its direct standard-library dependencies;
-- neutralizes the obsolete `ESPressio_EventListener.cpp` template definitions which no longer matched the header API;
-- removes the obsolete Arduino `String GetThreadNamePrefix()` API from `EventThread`;
-- removes public-header namespace pollution from the corrected Event Thread and enum headers;
-- fixes `EventListenerInterest` increment/decrement wrap-around to use its actual three enum values;
-- hardens Event reference counting against unmatched `__unref()` underflow;
-- prevents EventDispatcher from creating empty receiver buckets for unhandled Event types;
-- removes raw heap allocation for dispatcher receiver buckets;
-- avoids invoking receiver code while holding the EventDispatcher receiver-map mutex;
-- removes empty receiver buckets when the last receiver unregisters.
-
-The Event 5.x generic Timing/Threads architecture and optional Serializable Event design remain unchanged.
-
-## Compatibility
-
-ESPressio Event targets the ESP32 family using Arduino-ESP32.
-
-The implementation uses ESP-IDF FreeRTOS facilities, C++ RTTI, `std::shared_mutex`, and Arduino APIs through its dependency stack.
-
-RTTI must be enabled:
-
-```ini
-build_unflags =
-    -fno-rtti
-```
-
-## Dependencies
-
-Normal Event applications require only the dependencies declared by the library:
-
-```ini
+``` ini
 lib_deps =
     flowduino/ESPressio-Event@^5.4.0
 ```
 
 The mandatory dependency graph is:
 
-```text
-ESPressio Event 5.x
+``` text
+ESPressio Event 5.4
     |
-    +-- ESPressio Threads >= 3.0.0
-    |       |
-    |       +-- ESPressio Timing 2.x
-    |       +-- ESPressio Units
+    +-- ESPressio Threads >= 3.1.0
     |
     +-- ESPressio Observable >= 3.0.0
+    |
+    +-- ESPressio Timing >= 2.2.0
 ```
 
-**ESPressio Serializable is not a mandatory Event dependency.**
+ESPressio Units is available through the Timing dependency stack.
 
-Only applications that explicitly include the optional Serializable Event header need to add ESPressio Serializable.
+**ESPressio Serializable is not a mandatory Event dependency.** It is
+required only when an application explicitly opts into Serializable
+Events or Event Transport.
 
-## Generic Event Time Representation
+------------------------------------------------------------------------
 
-The base Event is now:
+# What is Event-Driven Observer Pattern?
 
-```cpp
+Event-Driven Observer Pattern is a means of fully decoupling distinct
+areas of application functionality.
+
+Instead of one module directly invoking another, the producer dispatches
+an `Event` containing context-specific payload data. Independent
+consumers register interest in that Event type and react when it is
+dispatched.
+
+Conceptually:
+
+``` text
+Producer
+   |
+   | dispatches
+   v
+ Event<T>
+   |
+   v
+EventManager
+   |
+   +----------+----------+
+   |          |          |
+   v          v          v
+Listener A Listener B Listener C
+```
+
+The producer does not need to know whether zero, one, or many listeners
+exist.
+
+An Event is therefore best thought of as a **data contract** between
+independently implemented pieces of functionality. The producer
+populates the contract; interested consumers read it.
+
+A central `EventManager` coordinates delivery to interested Event
+receivers. Any Event type can consequently be dispatched from anywhere
+in the application without the dispatching code acquiring direct
+relationships with its consumers.
+
+This is a natural asynchronous counterpart to the synchronous Observer
+Pattern provided by ESPressio Observable.
+
+## Order of execution
+
+Event-Driven Observer Pattern does not imply a globally defined order of
+execution between independent listeners.
+
+If an operation requires a strict synchronous ordering relationship,
+conventional Observer callbacks or direct sequencing may be more
+appropriate for that particular relationship.
+
+Use the mechanism that correctly expresses the semantics of the
+operation rather than forcing every interaction through Events.
+
+## Events are asynchronous
+
+Event dispatch is fundamentally asynchronous.
+
+When an Event is queued or stacked, the execution chain that dispatched
+it continues without waiting for every interested receiver to finish
+processing it.
+
+In practical terms, Events are **fire and forget**.
+
+This is one of the primary reasons Event-driven design is useful for
+separating application concerns: the producer neither knows nor waits
+for the implementation details of its consumers.
+
+## Reciprocal Events
+
+Asynchronous operation does not prevent request/result workflows.
+
+A listener processing one Event may dispatch a second, reciprocal Event
+containing the result of its work:
+
+``` text
+RequestEvent
+     |
+     v
+ Worker
+     |
+     v
+ResultEvent
+```
+
+The original requester can itself listen for the result Event without
+introducing a direct call relationship between the two modules.
+
+## Event-driven and synchronous Observer patterns are complementary
+
+Not every notification should become an Event.
+
+ESPressio deliberately supports both models:
+
+``` text
+ESPressio Observable
+    -> synchronous observation
+    -> useful when the caller/operation and notification are tightly related
+
+ESPressio Event
+    -> asynchronous observation
+    -> useful when producers and consumers should remain independently scheduled
+```
+
+The opt-in Timing and Threads Event Bridges demonstrate this distinction
+directly: the originating libraries expose synchronous Observer
+notifications, while ESPressio Event can optionally convert those
+notifications into asynchronous Events.
+
+------------------------------------------------------------------------
+
+# Understanding the components of ESPressio Event
+
+## `IEvent`
+
+`IEvent` is the non-templated, type-erased Event interface used by the
+routing infrastructure.
+
+Routing, receivers, listeners, ownership, and Event Manager
+infrastructure operate using:
+
+``` cpp
+IEvent*
+```
+
+Lifecycle timing is available to type-erased infrastructure as raw
+nanoseconds:
+
+``` cpp
+uint64_t GetDispatchTimeNanoseconds() const;
+uint64_t GetTimeSinceDispatchNanoseconds() const;
+```
+
+This keeps the Event engine independent of the public Unit
+representation chosen by a concrete Event.
+
+## `Event<TTime>`
+
+The normal Event base is:
+
+``` cpp
 template<
     typename TTime = Timing::DefaultClockTime
 >
@@ -442,15 +278,51 @@ class Event;
 
 Ordinary Event code therefore uses:
 
-```cpp
+``` cpp
 class MyEvent :
     public ESPressio::Event::Event<> {
 };
 ```
 
-A different Timing-compatible public representation can be selected:
+An Event normally contains the immutable contextual payload needed by
+its consumers.
 
-```cpp
+For example:
+
+``` cpp
+class TemperatureChangeEvent final :
+    public ESPressio::Event::Event<> {
+
+private:
+    const int _previousTemperature;
+    const int _newTemperature;
+
+public:
+    TemperatureChangeEvent(
+        int previousTemperature,
+        int newTemperature
+    ) :
+        _previousTemperature(previousTemperature),
+        _newTemperature(newTemperature) {
+    }
+
+    int GetPreviousTemperature() const {
+        return _previousTemperature;
+    }
+
+    int GetNewTemperature() const {
+        return _newTemperature;
+    }
+};
+```
+
+The producer and consumers need to agree only on this Event contract.
+
+### Generic time representation
+
+A different Timing-compatible public representation may be selected:
+
+``` cpp
 using MyTime = SomeCompatibleTimeType;
 
 class MyEvent :
@@ -458,78 +330,128 @@ class MyEvent :
 };
 ```
 
-### Type-erased Event engine
+The strongly typed lifecycle API is then:
 
-`IEvent` remains non-templated.
-
-Routing, receivers, the Event Manager, reference ownership, and listeners continue to operate using:
-
-```cpp
-IEvent*
-```
-
-The Event engine exposes raw lifecycle timing through:
-
-```cpp
-uint64_t GetDispatchTimeNanoseconds() const;
-uint64_t GetTimeSinceDispatchNanoseconds() const;
-```
-
-while `Event<TTime>` exposes the strongly typed API:
-
-```cpp
+``` cpp
 TTime GetDispatchTime() const;
 TTime GetTimeSinceDispatch() const;
 ```
 
-This keeps the routing infrastructure independent of the selected public Unit representation.
+Internally, Event lifecycle timing remains stored as raw nanoseconds and
+is converted through:
 
-## Internal Timing State
-
-Event lifecycle timing is stored internally as raw nanoseconds:
-
-```text
-dispatch state
-    |
-    +-- was dispatched
-    +-- dispatch time nanoseconds
-```
-
-The selected `TTime` representation is created only at the public API boundary through:
-
-```cpp
+``` cpp
 Timing::TimeTraits<TTime>
 ```
 
-This means choosing a Serializable or another richer Unit representation does not add representation-specific state to Event routing.
-
 The Event System Clock uses:
 
-```cpp
+``` cpp
 Timing::SystemClock<TTime>::GetInstance()
 ```
 
-Timing 2.x typed System Clock facades share one underlying global System Clock core.
+Timing 2.x typed System Clock facades share one underlying global System
+Clock core.
 
-## Listener Age Filtering
+## Dispatching Events
 
-`EventListenerInterest::YoungerThan` is now representation-independent.
+An Event can be dispatched from anywhere.
 
-The public threshold remains the default `EventTime` Unit, but the listener converts it through:
+Queue dispatch provides FIFO semantics:
 
-```cpp
-Timing::TimeTraits<EventTime>
+``` cpp
+(new TemperatureChangeEvent(
+    previousTemperature,
+    temperature
+))->Queue();
 ```
 
-and compares it directly with the Event's type-erased raw nanosecond age.
+Stack dispatch provides LIFO semantics:
 
-This removes the former dependency on Timing 1.x `ClockBase` conversion helpers.
+``` cpp
+(new TemperatureChangeEvent(
+    previousTemperature,
+    temperature
+))->Stack();
+```
 
-## PrecisionEventThread
+The first dispatch records the Event's dispatch time. Redispatching the
+same Event does not replace that original timestamp.
 
-`PrecisionEventThread` now mirrors the generic ESPressio Threads 3.x Precision Thread model:
+## Event priority
 
-```cpp
+Events may be dispatched using the supported Event priority levels.
+Priority participates in the Event receiver's normal dispatch ordering.
+
+When no explicit priority is supplied, normal priority is used.
+
+## Event receiver queues
+
+Event receiver queues are bounded to 64 pending Events by default.
+
+Define:
+
+``` cpp
+ESPRESSIO_EVENT_DEFAULT_MAX_PENDING_EVENT_COUNT
+```
+
+before including the library to choose another embedded-safe default, or
+explicitly configure a receiver maximum of zero when an unbounded queue
+is genuinely required.
+
+Queue diagnostics include:
+
+``` cpp
+GetPendingEventCount()
+GetPeakPendingEventCount()
+GetRejectedEventCount()
+GetDroppedEventCount()
+ResetEventQueueStatistics()
+```
+
+Drained Event collections have a separate retained-capacity policy:
+
+``` cpp
+EventCollectionCapacityPolicy::Retain
+EventCollectionCapacityPolicy::ShrinkWhenUnderutilized
+EventCollectionCapacityPolicy::ReleaseAfterDrain
+```
+
+For example:
+
+``` cpp
+thread.SetEventCollectionCapacityPolicy(
+    Event::EventCollectionCapacityPolicy::ShrinkWhenUnderutilized
+);
+
+thread.SetMinimumRetainedEventCapacity(4);
+thread.SetEventCapacityExcessFactor(2);
+```
+
+## `EventThread`
+
+`EventThread` is the principal Event-processing Thread type.
+
+It is built on ESPressio Threads, but differs from a conventional
+continuously looping Thread.
+
+An `EventThread` can remain efficiently suspended until an Event
+matching one of its registered listeners arrives. The relevant Event
+callback is then executed on the Event Thread's own task. Once pending
+Events have been processed, the Thread can return to waiting without
+consuming CPU cycles merely to poll for work.
+
+Remember:
+
+> An Event can be created and dispatched from anywhere. Only
+> Event-capable receiver types need to participate in Event processing.
+
+## `PrecisionEventThread<TTime, Traits>`
+
+`PrecisionEventThread` combines Event processing with the deterministic
+iteration model provided by ESPressio Threads:
+
+``` cpp
 template<
     typename TTime = Timing::DefaultClockTime,
     typename TRepresentationTraits =
@@ -540,70 +462,488 @@ class PrecisionEventThread;
 
 Ordinary usage:
 
-```cpp
+``` cpp
 class ControlThread :
     public ESPressio::Event::PrecisionEventThread<> {
 };
 ```
 
-A different time representation can be selected without duplicating the Event-processing or precision-scheduling implementation.
+Event processing order can be configured using:
 
-The injected clock type is:
-
-```cpp
-Timing::ISystemClock<
-    PrecisionEventThread::IterationTime
->*
-```
-
-and the default clock uses the shared Timing 2.x System Clock.
-
-### Event processing policies
-
-The existing policies remain:
-
-```cpp
+``` cpp
 PrecisionEventProcessOrder::EventsBeforeIteration
 PrecisionEventProcessOrder::EventsAfterIteration
 ```
 
-and:
+Arrival behavior can be configured using:
 
-```cpp
+``` cpp
 PrecisionEventArrivalPolicy::ProcessOnNextIteration
 PrecisionEventArrivalPolicy::TriggerImmediateIteration
 PrecisionEventArrivalPolicy::ProcessImmediately
 ```
 
-## Optional Serializable Events
+`ProcessImmediately` still means asynchronously as soon as the owning
+task is scheduled; Event handlers are not moved onto the dispatching
+task.
 
-Serializable Event support lives in:
+## `EventListener`
 
-```cpp
+Listeners express interest in a specific Event type and invoke
+application code when a matching Event is delivered.
+
+A listener can be registered on an Event-capable receiver:
+
+``` cpp
+Event::EventListenerHandlePtr handle =
+    eventThread.RegisterListener<
+        TemperatureChangeEvent
+    >(
+        [](TemperatureChangeEvent* event,
+           Event::EventDispatchMethod dispatchMethod,
+           Event::EventPriority priority) {
+
+            // React to the Event.
+        }
+    );
+```
+
+The returned handle owns the registration lifetime. Destroying or
+unregistering the handle removes the listener.
+
+Listeners can therefore be enabled or disabled dynamically without
+adding a boolean check to every callback invocation.
+
+### Listener interest
+
+Listener interest policies allow a receiver to reject Events that are
+not relevant to it.
+
+`EventListenerInterest::YoungerThan` uses a typed `EventTime` threshold,
+converted through Timing traits and compared with the Event's raw
+nanosecond age.
+
+Custom interest logic can also be used where application-specific
+filtering is required.
+
+## Typed Event Observers
+
+Callback-based listeners can alternatively be represented as typed
+Observers.
+
+Implement:
+
+``` cpp
+IEventObserver<EventType>
+```
+
+and register it with the Event receiver:
+
+``` cpp
+class TemperatureObserver :
+    public Event::IEventObserver<
+        TemperatureChangeEvent
+    > {
+
+public:
+    void OnEvent(
+        TemperatureChangeEvent* event,
+        Event::EventDispatchMethod dispatchMethod,
+        Event::EventPriority priority
+    ) override {
+        // React to the Event.
+    }
+};
+```
+
+Registration uses the same asynchronous Event pipeline:
+
+``` cpp
+TemperatureObserver observer;
+
+Event::EventListenerHandlePtr observerHandle =
+    eventThread.RegisterObserver<
+        TemperatureChangeEvent
+    >(
+        &observer
+    );
+```
+
+`IEventObserver<EventType>` derives from ESPressio Observable's
+`IObserver` contract.
+
+Observers are non-owning: the Observer instance must remain alive until
+its registration handle is unregistered or destroyed.
+
+An Observer may implement multiple `IEventObserver<EventType>`
+interfaces and register each independently.
+
+## `EventManager`
+
+`EventManager` is the central asynchronous dispatch infrastructure.
+
+It coordinates the transit of Events from dispatching code to the
+interested Event receivers without requiring the producer to know those
+receivers.
+
+The Event Manager is process-lifetime FreeRTOS infrastructure. Its task,
+semaphore, dispatcher, and per-Event-type routing structures
+intentionally remain allocated until device shutdown; this is fixed
+infrastructure rather than leaked per-dispatch Event ownership.
+
+------------------------------------------------------------------------
+
+# Type topology
+
+The complete Event type topology is available here:
+
+[![ESPressio Event complete type
+topology](diagrams/espressio-event-type-topology.png)](diagrams/espressio-event-type-topology.png)
+
+The editable vector source is available at:
+
+[`diagrams/espressio-event-type-topology.svg`](diagrams/espressio-event-type-topology.svg)
+
+------------------------------------------------------------------------
+
+# Usage example: a decoupled thermometer
+
+The following example illustrates the core purpose of the library.
+
+We want three independent pieces of functionality:
+
+``` text
+Thermometer
+    -> reads a sensor
+
+TemperatureSerialLogger
+    -> reports changes to Serial
+
+TemperatureDisplay
+    -> updates a physical display
+```
+
+None should need a direct reference to either of the others.
+
+Their only shared contract is:
+
+``` cpp
+TemperatureChangeEvent
+```
+
+## `TemperatureChangeEvent`
+
+``` cpp
+#pragma once
+
+#include <ESPressio_Event.hpp>
+
+class TemperatureChangeEvent final :
+    public ESPressio::Event::Event<> {
+
+private:
+    const int _previousTemperature;
+    const int _newTemperature;
+
+public:
+    TemperatureChangeEvent(
+        int previousTemperature,
+        int newTemperature
+    ) :
+        _previousTemperature(previousTemperature),
+        _newTemperature(newTemperature) {
+    }
+
+    int GetPreviousTemperature() const {
+        return _previousTemperature;
+    }
+
+    int GetNewTemperature() const {
+        return _newTemperature;
+    }
+};
+```
+
+Both values are supplied through the constructor and no setters are
+exposed. The Event therefore describes one complete temperature
+transition.
+
+## `TemperatureSerialLogger`
+
+``` cpp
+#pragma once
+
+#include <Arduino.h>
+#include <ESPressio_EventThread.hpp>
+
+#include "TemperatureChangeEvent.hpp"
+
+class TemperatureSerialLogger final :
+    public ESPressio::Event::EventThread {
+
+private:
+    ESPressio::Event::EventListenerHandlePtr
+        _temperatureChangeListener =
+            RegisterListener<
+                TemperatureChangeEvent
+            >(
+                [](TemperatureChangeEvent* event,
+                   ESPressio::Event::EventDispatchMethod,
+                   ESPressio::Event::EventPriority) {
+
+                    const int change =
+                        event->GetNewTemperature() -
+                        event->GetPreviousTemperature();
+
+                    const char* direction =
+                        change >= 0 ? "UP" : "DOWN";
+
+                    const int magnitude =
+                        change >= 0 ? change : -change;
+
+                    Serial.printf(
+                        "Temperature is %s by %d degrees "
+                        "(from %d to %d).\n",
+                        direction,
+                        magnitude,
+                        event->GetPreviousTemperature(),
+                        event->GetNewTemperature()
+                    );
+                }
+            );
+
+public:
+    TemperatureSerialLogger() :
+        EventThread(false) {
+    }
+};
+```
+
+The logger contains no sensor code and no display code. It understands
+only the Event contract.
+
+## `TemperatureDisplay`
+
+A display implementation can independently register for exactly the same
+Event:
+
+``` cpp
+#pragma once
+
+#include <ESPressio_EventThread.hpp>
+
+#include "TemperatureChangeEvent.hpp"
+
+class TemperatureDisplay final :
+    public ESPressio::Event::EventThread {
+
+private:
+    ESPressio::Event::EventListenerHandlePtr
+        _temperatureChangeListener =
+            RegisterListener<
+                TemperatureChangeEvent
+            >(
+                [this](TemperatureChangeEvent* event,
+                       ESPressio::Event::EventDispatchMethod,
+                       ESPressio::Event::EventPriority) {
+
+                    DisplayTemperature(
+                        event->GetNewTemperature()
+                    );
+                }
+            );
+
+    void DisplayTemperature(int temperature) {
+        // Update the application's physical display.
+    }
+
+public:
+    TemperatureDisplay() :
+        EventThread(false) {
+    }
+};
+```
+
+Again, there is no relationship to the logger or sensor implementation.
+
+## `Thermometer`
+
+The sensor-side code only needs to dispatch the Event:
+
+``` cpp
+#pragma once
+
+#include "TemperatureChangeEvent.hpp"
+
+class Thermometer {
+
+private:
+    int _temperature = 0;
+
+    int ReadTemperatureSensor() {
+        // Replace with the appropriate sensor implementation.
+        return _temperature;
+    }
+
+public:
+    void UpdateTemperature() {
+        const int temperature =
+            ReadTemperatureSensor();
+
+        if (temperature == _temperature) {
+            return;
+        }
+
+        const int previousTemperature =
+            _temperature;
+
+        _temperature = temperature;
+
+        (new TemperatureChangeEvent(
+            previousTemperature,
+            temperature
+        ))->Queue();
+    }
+};
+```
+
+The significant line is simply:
+
+``` cpp
+(new TemperatureChangeEvent(
+    previousTemperature,
+    temperature
+))->Queue();
+```
+
+The Thermometer does not know which modules---if any---will process the
+Event.
+
+## Example topology
+
+[![Thermometer example decoupled event
+topology](diagrams/thermometer-example-topology.png)](diagrams/thermometer-example-topology.png)
+
+The editable vector source is available at:
+
+[`diagrams/thermometer-example-topology.svg`](diagrams/thermometer-example-topology.svg)
+
+The important result is:
+
+``` text
+TemperatureSerialLogger
+    has no direct relationship with
+    TemperatureDisplay or Thermometer
+
+TemperatureDisplay
+    has no direct relationship with
+    TemperatureSerialLogger or Thermometer
+
+Thermometer
+    has no direct relationship with
+    TemperatureSerialLogger or TemperatureDisplay
+```
+
+Yet both consumers react independently whenever `Thermometer` dispatches
+a `TemperatureChangeEvent`.
+
+Additional consumers can be introduced later without modifying the
+existing producer or consumers.
+
+That is the central architectural advantage of ESPressio Event.
+
+------------------------------------------------------------------------
+
+# Precision Event Thread example
+
+``` cpp
+#include <ESPressio_Event.hpp>
+#include <ESPressio_PrecisionEventThread.hpp>
+
+using namespace ESPressio;
+
+class SetpointEvent final :
+    public Event::Event<> {
+
+private:
+    const int _setpoint;
+
+public:
+    explicit SetpointEvent(int setpoint) :
+        _setpoint(setpoint) {
+    }
+
+    int GetSetpoint() const {
+        return _setpoint;
+    }
+};
+
+class ControlThread final :
+    public Event::PrecisionEventThread<> {
+
+private:
+    int _setpoint = 0;
+
+protected:
+    void OnIteration(
+        IterationTime delta,
+        IterationTime startTime,
+        Threads::SkippedIterationCount skippedIterations
+    ) override {
+        (void)delta;
+        (void)startTime;
+        (void)skippedIterations;
+
+        // Perform deterministic control work.
+    }
+
+public:
+    void ApplySetpoint(SetpointEvent* event) {
+        _setpoint = event->GetSetpoint();
+    }
+};
+```
+
+See:
+
+``` text
+examples/PrecisionEventThread
+```
+
+for the complete repository example.
+
+------------------------------------------------------------------------
+
+# Optional Serializable Events
+
+Serializable Event support is opt-in:
+
+``` cpp
 #include <ESPressio_Event_Serializable.hpp>
 ```
 
-or the equivalent convenience umbrella:
+or:
 
-```cpp
+``` cpp
 #include <ESPressio_SerializableEvent.hpp>
 ```
 
-Neither header is imported by normal `ESPressio_Event.hpp`.
+Neither is imported by the normal `ESPressio_Event.hpp` path.
 
-A consuming application which uses Serializable Events declares:
+A consuming application using Serializable Events declares ESPressio
+Serializable explicitly:
 
-```ini
+``` ini
 lib_deps =
     flowduino/ESPressio-Event@^5.4.0
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 
-### SerializableEvent
+## `SerializableEvent`
 
 The optional base is:
 
-```cpp
+``` cpp
 template<
     typename TDerived,
     typename TTime =
@@ -614,7 +954,7 @@ class SerializableEvent;
 
 Example:
 
-```cpp
+``` cpp
 #include <ESPressio_Event_Serializable.hpp>
 
 class TemperatureEvent final :
@@ -631,9 +971,7 @@ public:
         TemperatureEvent
     )
 
-    ESPRESSIO_SERIALIZABLE_SCHEMA_VERSION(
-        1
-    )
+    ESPRESSIO_SERIALIZABLE_SCHEMA_VERSION(1)
 
     ESPRESSIO_SERIALIZABLE_PROPERTIES(
         ESPRESSIO_PROPERTY(
@@ -648,34 +986,32 @@ public:
 };
 ```
 
-The inherited Event `TimeType` is itself a Serializable ESPressio Unit.
+The derived payload can use the ESPressio Serializable feature set,
+including JSON, CBOR, Binary, schema versions, aliases, validation,
+migrations, streaming, and schema introspection.
 
-The derived Event payload can therefore use the complete ESPressio Serializable feature set, including JSON, CBOR, Binary, schema versions, aliases, validation, migrations, streaming, and schema introspection.
+## What is not serialized
 
-## What Is Not Serialized
+Local Event runtime state is deliberately not Event payload:
 
-The Event engine deliberately does **not** serialize local runtime lifecycle state.
-
-The following are not Event payload:
-
-```text
+``` text
 reference count
 local dispatch status
 local System Clock dispatch timestamp
 routing/listener state
 ```
 
-Serializing these values would produce incorrect semantics when an Event is transmitted to another ESP32 or restored after restart.
+A deserialized Serializable Event is a **new local Event** which can
+subsequently be queued or stacked normally.
 
-A deserialized Serializable Event is therefore a **new local Event** which can subsequently be queued or stacked normally.
+Transport metadata belongs either explicitly in the Event payload or in
+the transport envelope.
 
-Transport metadata such as origin device identity, correlation IDs, sequence numbers, or source timestamps should be represented explicitly in the Event payload or in a separate transport envelope.
+## Ordinary Events remain serialization-free
 
-## Ordinary Events Remain Serialization-Free
+This:
 
-This code:
-
-```cpp
+``` cpp
 #include <ESPressio_Event.hpp>
 
 class ButtonEvent :
@@ -683,27 +1019,282 @@ class ButtonEvent :
 };
 ```
 
-does not include, compile, link, or require ESPressio Serializable.
+does not require ESPressio Serializable.
 
-The normal Event library metadata deliberately contains no Serializable dependency.
+------------------------------------------------------------------------
 
-This preserves the pay-for-what-you-use design:
+# Observer-to-Event bridges
 
-```text
-ordinary Event
-    -> no Serializable dependency
+ESPressio Event can optionally convert synchronous Observer
+notifications from other ESPressio libraries into asynchronous Events.
 
-SerializableEvent
-    -> consuming application opts into Serializable
+The important dependency direction is:
+
+``` text
+Timing / Threads
+    expose synchronous Observer APIs
+
+Event
+    optionally consumes those APIs
+    and emits asynchronous Events
 ```
 
-## Migration from 4.x
+Timing and Threads therefore do not need to depend upward on Event.
 
-### Event
+## System Clock Event Bridge
+
+Timing 2.2 System Clock Observer notifications can be bridged using:
+
+``` cpp
+#include <ESPressio_SystemClockEventBridge.hpp>
+
+Event::SystemClockEventBridge::
+    GetInstance().
+    Initialize();
+```
+
+Timing Events are grouped under:
+
+``` text
+src/timing-events/
+```
+
+with:
+
+``` cpp
+#include <ESPressio_TimingEvents.hpp>
+```
+
+Every `ISystemClockObserver` callback has a corresponding strongly typed
+Event carrying the relevant callback snapshot, including synchronization
+before/after values, clock difference, result/status, state changes,
+configuration changes, and callback lifecycle information.
+
+Serializable counterparts are separately opt-in:
+
+``` cpp
+#include <ESPressio_TimingEvents_Serializable.hpp>
+#include <ESPressio_SystemClockEventBridge_Serializable.hpp>
+
+Event::SerializableSystemClockEventBridge::
+    GetInstance().
+    Initialize();
+```
+
+Both bridges remain dormant until explicitly initialized.
+
+## Threads infrastructure Event Bridges
+
+The singleton infrastructure Observer APIs in ESPressio Threads can
+similarly be bridged through:
+
+``` cpp
+ThreadManagerEventBridge
+ThreadGarbageCollectorEventBridge
+ThreadTerminationDispatcherEventBridge
+```
+
+and the opt-in Serializable counterparts:
+
+``` cpp
+SerializableThreadManagerEventBridge
+SerializableThreadGarbageCollectorEventBridge
+SerializableThreadTerminationDispatcherEventBridge
+```
+
+Thread Events are grouped beneath:
+
+``` text
+src/thread-events/
+```
+
+with:
+
+``` cpp
+#include <ESPressio_ThreadEvents.hpp>
+#include <ESPressio_ThreadEvents_Serializable.hpp>
+```
+
+Bridge batch headers are:
+
+``` cpp
+#include <ESPressio_ThreadEventBridges.hpp>
+#include <ESPressio_ThreadEventBridges_Serializable.hpp>
+```
+
+The ordinary bridges do not require ESPressio Serializable.
+
+------------------------------------------------------------------------
+
+# Event Transport
+
+Version 5.3 introduced a transport-neutral bidirectional routing layer
+for Serializable Events, extended in 5.4 with per-transport routing
+policy.
+
+The subsystem is opt-in:
+
+``` cpp
+#include <ESPressio_EventTransport.hpp>
+```
+
+Concrete transport implementations live outside ESPressio Event and
+implement:
+
+``` cpp
+IEventTransport
+```
+
+ESPressio Event owns:
+
+``` text
+Event type registration
+Binary serialization/deserialization
+stable wire identities
+inbound/outbound policy
+dispatch metadata
+pending-work lifecycle
+remote-to-local loop prevention
+per-transport routing policy
+```
+
+## Stable Event type identity
+
+Every transported Event declares a stable wire identity:
+
+``` cpp
+ESPRESSIO_EVENT_TRANSPORT_TYPE(
+    MySerializableEvent,
+    "com.example.my-event.v1"
+)
+```
+
+The stable name is converted to the wire identifier; RTTI implementation
+names are not used as protocol contracts.
+
+## Registering Event directions
+
+Global/default policy:
+
+``` cpp
+manager.RegisterInboundEvent<RemoteCommandEvent>();
+manager.RegisterOutboundEvent<TelemetryEvent>();
+manager.RegisterBidirectionalEvent<SharedStateEvent>();
+```
+
+C++17 bulk forms are available:
+
+``` cpp
+manager.RegisterOutboundEvents<
+    TelemetryEvent,
+    DiagnosticsEvent,
+    BatteryStatusEvent
+>();
+```
+
+A concrete transport can have its own override:
+
+``` cpp
+manager.RegisterOutboundEvent<
+    TelemetryEvent
+>(
+    &udpTransport
+);
+
+manager.RegisterBidirectionalEvent<
+    SharedStateEvent
+>(
+    &espNowTransport
+);
+```
+
+The model is:
+
+``` text
+global/default direction
+        +
+optional per-transport override
+```
+
+A transport-specific override is authoritative for that transport,
+including `EventTransportDirection::None`.
+
+## Multiple transports
+
+Multiple transports can be registered simultaneously:
+
+``` cpp
+manager.RegisterTransport(
+    &espNowTransport
+);
+
+manager.RegisterTransport(
+    &udpTransport
+);
+```
+
+The same Event can therefore have different routing policy on different
+physical/network mechanisms.
+
+## Unregistration and pending work
+
+Unregistration mirrors registration and includes bulk forms.
+
+Pending work can be independently configured to complete or be discarded
+using:
+
+``` cpp
+EventTransportUnregistrationOptions
+```
+
+Transport-scoped unregistration affects only matching work for the
+selected transport.
+
+## Remote origin and loop prevention
+
+`EventDispatchContext` records whether an Event originated locally or
+remotely, together with transport metadata such as message ID and hop
+count.
+
+Remotely received Events are dispatched normally to local listeners but
+are **not retransmitted by default**, preventing simple transport loops
+such as:
+
+``` text
+A -> B -> A -> B ...
+```
+
+## Wire envelope
+
+The version-1 transport envelope preserves:
+
+``` text
+stable Event type ID
+Serializable schema version
+message ID
+dispatch method
+priority
+hop count
+payload length
+```
+
+The payload uses ESPressio Serializable `BinaryArchive`.
+
+## EventTransportManager observation
+
+`EventTransportManager` exposes an `IEventTransportManagerObserver`
+surface for transport registration, type/route lifecycle, and
+inbound/outbound diagnostics.
+
+------------------------------------------------------------------------
+
+# Migration from 4.x
+
+## Event inheritance
 
 4.x:
 
-```cpp
+``` cpp
 class MyEvent :
     public Event::Event {
 };
@@ -711,17 +1302,17 @@ class MyEvent :
 
 5.x:
 
-```cpp
+``` cpp
 class MyEvent :
     public Event::Event<> {
 };
 ```
 
-### PrecisionEventThread
+## PrecisionEventThread inheritance
 
 4.x:
 
-```cpp
+``` cpp
 class MyThread :
     public Event::PrecisionEventThread {
 };
@@ -729,97 +1320,52 @@ class MyThread :
 
 5.x:
 
-```cpp
+``` cpp
 class MyThread :
     public Event::PrecisionEventThread<> {
 };
 ```
 
-### EventTime
+## Event time
 
-Timing 1.x's global:
+Timing 1.x's fixed `ClockTime` is no longer the Event representation
+contract.
 
-```cpp
-Timing::ClockTime
-```
+The default representation is:
 
-is no longer used.
-
-The default Event representation is:
-
-```cpp
+``` cpp
 Timing::DefaultClockTime
 ```
 
-and generic Event code should prefer:
+Generic code should prefer:
 
-```cpp
+``` cpp
 typename MyEvent::TimeType
 ```
 
-### IEvent lifecycle timing
+## Type-erased lifecycle timing
 
-`IEvent` no longer exposes a fixed typed return value for dispatch time.
+`IEvent` infrastructure uses:
 
-Type-erased infrastructure should use:
-
-```cpp
+``` cpp
 GetDispatchTimeNanoseconds()
 GetTimeSinceDispatchNanoseconds()
 ```
 
-Concrete Event consumers use:
+while concrete typed Events expose:
 
-```cpp
+``` cpp
 event->GetDispatchTime()
 event->GetTimeSinceDispatch()
 ```
 
-on their typed `Event<TTime>` descendant.
+------------------------------------------------------------------------
 
-## Example: Precision Event Thread
+# Design summary
 
-```cpp
-class SetpointEvent final :
-    public Event::Event<> {
-    // payload
-};
+The core 5.x architecture is:
 
-class ControlThread final :
-    public Event::PrecisionEventThread<> {
-
-protected:
-    void OnIteration(
-        IterationTime delta,
-        IterationTime startTime,
-        Threads::SkippedIterationCount skipped
-    ) override {
-        // ...
-    }
-};
-```
-
-See:
-
-```text
-examples/PrecisionEventThread
-```
-
-## Example: Serializable Event
-
-See:
-
-```text
-examples/SerializableEvent
-```
-
-The example defines a Serializable Event payload and serializes it through the normal ESPressio Serializable archive API.
-
-## Design Summary
-
-Event 5.0 establishes these boundaries:
-
-```text
+``` text
                          IEvent
                   type-erased Event core
                          |
@@ -829,7 +1375,7 @@ Event 5.0 establishes these boundaries:
               +----------+----------+
               |                     |
               v                     v
- DefaultClockTime        SerializableNanoSeconds
+     DefaultClockTime      SerializableNanoSeconds
                                     |
                                     v
                          SerializableEvent<TDerived>
@@ -837,13 +1383,45 @@ Event 5.0 establishes these boundaries:
 
 and:
 
-```text
+``` text
 Threads::PrecisionThread<TTime, Traits>
                     |
                     v
 PrecisionEventThread<TTime, Traits>
 ```
 
-The architecture provides one Event engine, one routing system, and one PrecisionEventThread implementation while allowing the public Unit representation to vary at compile time.
+The wider integration architecture is:
 
-Most importantly, optional serialization remains genuinely optional.
+``` text
+                 ESPressio Event
+                       |
+        +--------------+--------------+
+        |              |              |
+        v              v              v
+ local routing    Event Bridges   Event Transport
+        |              |              |
+        |         Timing/Threads      |
+        |          Observers           |
+        |                             |
+        +-----------------------------+
+                       |
+                Event contracts
+```
+
+The library therefore provides one Event engine and one asynchronous
+routing system while allowing:
+
+-   the public time representation to vary at compile time;
+-   synchronous subsystem notifications to be bridged into Events only
+    when requested;
+-   Serializable Events to remain optional;
+-   concrete network/radio transports to remain outside Event;
+-   global and per-transport routing policy to coexist.
+
+Most importantly, the original Event-driven design principle remains
+unchanged:
+
+> **Application modules communicate through Event contracts rather than
+> acquiring direct relationships with one another.**
+
+That is the purpose of ESPressio Event.
