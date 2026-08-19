@@ -67,6 +67,103 @@ ESPressio Event follows those principles by making the Event itself the
 shared data contract while keeping Event producers and Event consumers
 independent of one another.
 
+## Runtime Serializable Event Discovery and Construction (5.6.0)
+
+ESPressio Event 5.6.0 exposes the Serializable Event registry as a safe runtime API. This is intended for operator consoles, REST/WebSocket gateways, test harnesses, Event replay, and other systems that discover Event types by stable wire identity rather than by C++ template type.
+
+Registered Event types can be enumerated:
+
+```cpp
+auto& manager =
+    ESPressio::Event::EventTransportManager::GetInstance();
+
+for (const auto& event : manager.GetRegisteredSerializableEvents()) {
+    // event.TypeID
+    // event.TypeName
+    // event.SchemaVersion
+    // event.DefaultDirection
+    // event.Properties
+    // event.CanConstruct
+}
+```
+
+A specific registration can be queried by stable name or ID:
+
+```cpp
+ESPressio::Event::SerializableEventDescriptor descriptor;
+
+if (manager.FindRegisteredSerializableEvent(
+        "flowduino.camera.shutter.v1",
+        descriptor)) {
+    // Inspect descriptor.Properties, schema version, routing, etc.
+}
+```
+
+Descriptors are snapshots. They do not expose references to the manager's private registration table.
+
+### Runtime construction
+
+Runtime construction accepts ESPressio Serializable's representation-neutral `SerializationNode`:
+
+```cpp
+auto result = manager.CreateSerializableEvent(
+    "flowduino.camera.shutter.v1",
+    payloadNode
+);
+
+if (!result) {
+    for (const auto& issue : result.Deserialization.Issues()) {
+        // issue.Code
+        // issue.Path
+        // issue.Message
+    }
+}
+```
+
+The normal Serializable machinery remains authoritative: schema migration, aliases, defaults, required properties, numeric constraints, validators, and detailed deserialization diagnostics are all applied by the concrete Event type.
+
+Only Event types for which Event Transport has a runtime factory are constructible. In practice, inbound/bidirectional Serializable Events are expected to be default constructible, matching the existing Event Transport reconstruction model.
+
+### Representation-neutral by design
+
+Event 5.6.0 intentionally does **not** parse JSON itself:
+
+```text
+JSON / CBOR / CLI / replay data
+          |
+          v
+   SerializationNode
+          |
+          v
+EventTransportManager
+          |
+          v
+concrete Serializable Event
+```
+
+A Serial console can therefore use `JsonArchive`, while another integration can construct the same `SerializationNode` from a different representation. This keeps ArduinoJson and console-specific policy out of ESPressio Event.
+
+### Ownership-safe runtime dispatch
+
+A successfully constructed Event can be dispatched without recovering its concrete C++ type:
+
+```cpp
+ESPressio::Event::EventTransportManager::DispatchSerializableEvent(
+    std::move(result.Event),
+    ESPressio::Event::EventDispatchMethod::Queue,
+    ESPressio::Event::EventPriority::Normal
+);
+```
+
+`Queue` and `Stack` are supported. Once dispatched, the Event follows the ordinary Event engine path; existing `EventTransportManager` routing therefore continues to determine whether it is also transmitted over ESP-NOW, UDP, TCP, WebSocket, or another registered transport.
+
+See:
+
+```text
+examples/RuntimeSerializableEvents/RuntimeSerializableEvents.ino
+```
+
+
 ## License
 
 ESPressio and its component libraries are licensed under the **Apache

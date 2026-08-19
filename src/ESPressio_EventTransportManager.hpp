@@ -22,6 +22,8 @@
 #include <freertos/semphr.h>
 
 #include <ESPressio_BinaryArchive.hpp>
+#include <ESPressio_TreeArchive.hpp>
+#include <ESPressio_SchemaIntrospection.hpp>
 #include <ESPressio_SerializationTraits.hpp>
 #include <ESPressio_Thread.hpp>
 
@@ -30,6 +32,7 @@
 #include "ESPressio_EventTransportTypes.hpp"
 #include "ESPressio_IEventManagerObserver.hpp"
 #include "ESPressio_IEventTransport.hpp"
+#include "ESPressio_SerializableEventDescriptor.hpp"
 
 namespace ESPressio::Event {
 
@@ -76,6 +79,15 @@ private:
                 std::size_t
             )
         > Deserialize;
+
+        std::vector<Serializable::PropertySchemaInfo> Properties;
+
+        std::function<
+            SerializableEventConstructionResult(
+                const Serializable::SerializationNode&,
+                const Serializable::DeserializationOptions&
+            )
+        > ConstructFromNode;
 
 
         EventTransportDirection EffectiveDirection(
@@ -858,6 +870,9 @@ private:
         proposed.DefaultDirection =
             defaultDirection;
 
+        proposed.Properties =
+            Serializable::SchemaInspector<TEvent>::Properties();
+
         proposed.Serialize =
             [](
                 IEvent* event,
@@ -923,6 +938,28 @@ private:
                     }
 
                     return event.release();
+                };
+
+            proposed.ConstructFromNode =
+                [](
+                    const Serializable::SerializationNode& node,
+                    const Serializable::DeserializationOptions& options
+                ) -> SerializableEventConstructionResult {
+                    SerializableEventConstructionResult result;
+                    result.TypeRegistered = true;
+                    result.Constructible = true;
+
+                    auto event = std::make_unique<TEvent>();
+                    Serializable::TreeArchive archive;
+                    archive.GetNode() = node;
+
+                    result.Deserialization =
+                        event->DeserializeDetailed(archive, options);
+
+                    if (result.Deserialization.Success()) {
+                        result.Event = std::move(event);
+                    }
+                    return result;
                 };
         }
 
@@ -1063,8 +1100,13 @@ private:
                     !found->second.Deserialize &&
                     proposed.Deserialize
                 ) {
-                    found->second.Deserialize =
-                        proposed.Deserialize;
+                    found->second.Deserialize = proposed.Deserialize;
+                }
+                if (found->second.Properties.empty() && !proposed.Properties.empty()) {
+                    found->second.Properties = proposed.Properties;
+                }
+                if (!found->second.ConstructFromNode && proposed.ConstructFromNode) {
+                    found->second.ConstructFromNode = proposed.ConstructFromNode;
                 }
 
                 _runtimeTypes[
@@ -1251,8 +1293,13 @@ private:
                     !found->second.Deserialize &&
                     proposed.Deserialize
                 ) {
-                    found->second.Deserialize =
-                        proposed.Deserialize;
+                    found->second.Deserialize = proposed.Deserialize;
+                }
+                if (found->second.Properties.empty() && !proposed.Properties.empty()) {
+                    found->second.Properties = proposed.Properties;
+                }
+                if (!found->second.ConstructFromNode && proposed.ConstructFromNode) {
+                    found->second.ConstructFromNode = proposed.ConstructFromNode;
                 }
 
                 _runtimeTypes[
@@ -1681,6 +1728,130 @@ public:
         }
     }
 
+
+    std::vector<SerializableEventDescriptor>
+    GetRegisteredSerializableEvents() const {
+        std::vector<SerializableEventDescriptor> descriptors;
+        std::lock_guard<std::mutex> lock(_mutex);
+        descriptors.reserve(_registrations.size());
+        for (const auto& entry : _registrations) {
+            const auto& registration = entry.second;
+            SerializableEventDescriptor descriptor;
+            descriptor.TypeID = registration.TypeID;
+            descriptor.TypeName = std::string(registration.TypeName);
+            descriptor.SchemaVersion = registration.SchemaVersion;
+            descriptor.DefaultDirection = registration.DefaultDirection;
+            descriptor.Properties = registration.Properties;
+            descriptor.CanConstruct = static_cast<bool>(registration.ConstructFromNode);
+            descriptors.push_back(std::move(descriptor));
+        }
+        std::sort(descriptors.begin(), descriptors.end(),
+            [](const auto& a, const auto& b) { return a.TypeName < b.TypeName; });
+        return descriptors;
+    }
+
+    bool FindRegisteredSerializableEvent(
+        uint64_t typeID,
+        SerializableEventDescriptor& descriptor
+    ) const {
+        std::lock_guard<std::mutex> lock(_mutex);
+        const auto found = _registrations.find(typeID);
+        if (found == _registrations.end()) return false;
+        const auto& registration = found->second;
+        descriptor.TypeID = registration.TypeID;
+        descriptor.TypeName = std::string(registration.TypeName);
+        descriptor.SchemaVersion = registration.SchemaVersion;
+        descriptor.DefaultDirection = registration.DefaultDirection;
+        descriptor.Properties = registration.Properties;
+        descriptor.CanConstruct = static_cast<bool>(registration.ConstructFromNode);
+        return true;
+    }
+
+    bool FindRegisteredSerializableEvent(
+        std::string_view typeName,
+        SerializableEventDescriptor& descriptor
+    ) const {
+        std::lock_guard<std::mutex> lock(_mutex);
+        for (const auto& entry : _registrations) {
+            const auto& registration = entry.second;
+            if (registration.TypeName != typeName) continue;
+            descriptor.TypeID = registration.TypeID;
+            descriptor.TypeName = std::string(registration.TypeName);
+            descriptor.SchemaVersion = registration.SchemaVersion;
+            descriptor.DefaultDirection = registration.DefaultDirection;
+            descriptor.Properties = registration.Properties;
+            descriptor.CanConstruct = static_cast<bool>(registration.ConstructFromNode);
+            return true;
+        }
+        return false;
+    }
+
+    SerializableEventConstructionResult CreateSerializableEvent(
+        uint64_t typeID,
+        const Serializable::SerializationNode& node,
+        const Serializable::DeserializationOptions& options = {}
+    ) const {
+        std::function<SerializableEventConstructionResult(
+            const Serializable::SerializationNode&,
+            const Serializable::DeserializationOptions&)> factory;
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            const auto found = _registrations.find(typeID);
+            if (found == _registrations.end()) return {};
+            if (!found->second.ConstructFromNode) {
+                SerializableEventConstructionResult result;
+                result.TypeRegistered = true;
+                return result;
+            }
+            factory = found->second.ConstructFromNode;
+        }
+        return factory(node, options);
+    }
+
+    SerializableEventConstructionResult CreateSerializableEvent(
+        std::string_view typeName,
+        const Serializable::SerializationNode& node,
+        const Serializable::DeserializationOptions& options = {}
+    ) const {
+        std::function<SerializableEventConstructionResult(
+            const Serializable::SerializationNode&,
+            const Serializable::DeserializationOptions&)> factory;
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            for (const auto& entry : _registrations) {
+                if (entry.second.TypeName != typeName) continue;
+                if (!entry.second.ConstructFromNode) {
+                    SerializableEventConstructionResult result;
+                    result.TypeRegistered = true;
+                    return result;
+                }
+                factory = entry.second.ConstructFromNode;
+                break;
+            }
+        }
+        if (!factory) return {};
+        return factory(node, options);
+    }
+
+    static RuntimeEventDispatchResult DispatchSerializableEvent(
+        std::unique_ptr<IEvent> event,
+        EventDispatchMethod method = EventDispatchMethod::Queue,
+        EventPriority priority = EventPriority::Normal
+    ) {
+        if (!event) return RuntimeEventDispatchResult::NullEvent;
+        IEvent* released = event.release();
+        switch (method) {
+            case EventDispatchMethod::Queue:
+                released->Queue(priority);
+                return RuntimeEventDispatchResult::Dispatched;
+            case EventDispatchMethod::Stack:
+                released->Stack(priority);
+                return RuntimeEventDispatchResult::Dispatched;
+            default:
+                delete released;
+                return RuntimeEventDispatchResult::UnsupportedMethod;
+        }
+    }
 
     template<typename TEvent>
     EventTransportRegistrationResult

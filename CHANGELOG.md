@@ -12,6 +12,30 @@ Versioning](https://semver.org/).
 > had little or no release-note detail, the entry is intentionally terse
 > rather than inferring unsupported intent.
 
+## [5.6.0] - 2026-08-19
+
+### Added
+
+- Added public runtime discovery for registered Serializable Event types through `GetRegisteredSerializableEvents()`.
+- Added runtime lookup by stable Event type name or stable type ID through `FindRegisteredSerializableEvent(...)`.
+- Added immutable `SerializableEventDescriptor` snapshots exposing stable type identity, schema version, default transport direction, property schema metadata, and runtime constructibility.
+- Added type-erased `SerializationNode` → concrete Serializable Event construction through `CreateSerializableEvent(...)`.
+- Added `SerializableEventConstructionResult`, preserving ESPressio Serializable `DeserializationResult` validation and migration diagnostics.
+- Added ownership-safe type-erased Queue/Stack dispatch through `DispatchSerializableEvent(...)`.
+- Added runtime schema capture using ESPressio Serializable `SchemaInspector<TEvent>`.
+- Added `RuntimeSerializableEvents` example demonstrating discovery, schema inspection, representation-neutral construction, validation diagnostics, and runtime dispatch.
+
+### Changed
+
+- Extended Event Transport registration metadata with type-erased runtime construction and schema information.
+- Runtime construction deliberately consumes `SerializationNode` rather than JSON, keeping ESPressio Event independent of ArduinoJson and allowing Serial, REST, WebSocket, MQTT, tests, and replay tooling to choose their own input representation.
+- Existing Event registration, dispatch, listener, transport, and Observer APIs remain source-compatible.
+
+### Compatibility
+
+- This is a backward-compatible public interface extension; no existing interfaces were removed or changed.
+- ESPressio Serializable 0.9.0 remains the minimum dependency for Event Transport/runtime Serializable Event facilities.
+
 ## [5.5.0] - 2026-08-19
 
 ### Added
