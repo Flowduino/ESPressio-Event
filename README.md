@@ -4,7 +4,7 @@ Event-Driven Observer Pattern Components of the Flowduino ESPressio Development 
 
 ESPressio Event provides asynchronous typed Event routing, Event-aware Threads, bounded receiver queues, listener/observer registration, priority dispatch, and high-resolution Event timing for ESP32 applications.
 
-## Version 5.3.0
+## Version 5.4.0
 
 Version `5.1.0` extends the 5.x architecture with opt-in System Clock Observer-to-Event bridging, aligned with:
 
@@ -21,6 +21,115 @@ Serializable Event support remains optional: ordinary Event and Timing Event bri
 
 
 
+
+
+### 5.4.0 per-transport Event routing policy
+
+Version `5.4.0` extends `EventTransportManager` with transport-scoped Event routing.
+
+The global registration API introduced in 5.3 remains unchanged and acts as the default policy for every registered concrete transport:
+
+```cpp
+manager.RegisterOutboundEvent<TelemetryEvent>();
+manager.RegisterInboundEvent<RemoteCommandEvent>();
+manager.RegisterBidirectionalEvent<SharedStateEvent>();
+```
+
+Applications can now establish an explicit route for one concrete transport:
+
+```cpp
+manager.RegisterOutboundEvent<TelemetryEvent>(
+    &udpTransport
+);
+
+manager.RegisterBidirectionalEvent<SharedStateEvent>(
+    &espNowTransport
+);
+```
+
+C++17 variadic bulk forms are also provided:
+
+```cpp
+manager.RegisterOutboundEvents<
+    TelemetryEvent,
+    DiagnosticsEvent,
+    BatteryStatusEvent
+>(
+    &udpTransport
+);
+```
+
+The route model uses:
+
+```text
+global/default direction
+        +
+optional per-transport override
+```
+
+A transport-specific override is authoritative for that transport, including `EventTransportDirection::None`.
+
+This means a globally bidirectional Event can be selectively made inbound-only, outbound-only, or fully disabled on one transport without altering the policy for any other transport.
+
+Transport-specific registration deliberately creates an explicit override even when the global default already permits the requested direction. The scoped policy therefore remains stable if the global policy later changes.
+
+Transport-scoped unregistration mirrors registration:
+
+```cpp
+manager.UnregisterOutboundEvent<TelemetryEvent>(
+    &udpTransport,
+    options
+);
+
+manager.UnregisterInboundEvents<
+    CommandA,
+    CommandB
+>(
+    &espNowTransport,
+    options
+);
+```
+
+Pending-work policy is also scoped to the selected transport. `Discard` removes only matching pending work for that Event type and transport; work belonging to other concrete transports is unaffected.
+
+Global unregistration changes only the default direction. Existing per-transport overrides are intentionally preserved.
+
+For example:
+
+```text
+SharedStateEvent:
+    global default = Bidirectional
+
+    ESP-NOW override = Bidirectional
+    UDP override     = Outbound
+    Serial override  = None
+```
+
+A later global:
+
+```cpp
+manager.UnregisterOutboundEvent<SharedStateEvent>();
+```
+
+changes the default for transports without overrides while leaving the three explicit routes above intact.
+
+Outbound dispatch now creates one pending work item per eligible transport. This allows transport-specific pending cancellation while retaining one logical transport message ID across all fan-out copies of the same local Event.
+
+Inbound permission is evaluated against the concrete transport that supplied the packet.
+
+The active default/effective policy can be queried using:
+
+```cpp
+manager.GetEventTransportDirection<MyEvent>();
+
+manager.GetEventTransportDirection<MyEvent>(
+    &espNowTransport
+);
+```
+
+The first returns the global/default direction. The second returns the effective direction for the selected concrete transport after applying any explicit override.
+
+The transport-manager Observer surface now also exposes transport-scoped route lifecycle notifications and per-transport outbound acceptance notifications.
 
 ### 5.3.0 transport-neutral Serializable Event routing
 
@@ -287,7 +396,7 @@ Normal Event applications require only the dependencies declared by the library:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.3.0
+    flowduino/ESPressio-Event@^5.4.0
 ```
 
 The mandatory dependency graph is:
@@ -473,7 +582,7 @@ A consuming application which uses Serializable Events declares:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.3.0
+    flowduino/ESPressio-Event@^5.4.0
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 
