@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.6.2 — 2026-08-19
+
+### Changed
+- Updated active ESPressio dependency baselines to the latest released versions available on 2026-08-19.
+- Bounded dependency compatibility to the current major version so future breaking major releases are not selected automatically.
+- Updated the required ESPressio Threads baseline to 3.1.1 and ESPressio Timing baseline to 2.2.1, consuming the dependency-refresh patch releases produced earlier in the release chain.
+
 All notable changes to this project are documented in this file.
 
 The structure follows the principles of [Keep a

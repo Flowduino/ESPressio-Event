@@ -204,7 +204,7 @@ library:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.5.0
+    flowduino/ESPressio-Event@^5.6.2
 ```
 
 The mandatory dependency graph is:
@@ -212,11 +212,11 @@ The mandatory dependency graph is:
 ``` text
 ESPressio Event 5.4
     |
-    +-- ESPressio Threads >= 3.1.0
+    +-- ESPressio Threads >= 3.1.0 < 4.0.0
     |
-    +-- ESPressio Observable >= 3.0.0
+    +-- ESPressio Observable >= 3.0.0 < 4.0.0
     |
-    +-- ESPressio Timing >= 2.2.0
+    +-- ESPressio Timing >= 2.2.0 < 3.0.0
 ```
 
 ESPressio Units is available through the Timing dependency stack.
@@ -1034,7 +1034,7 @@ Serializable explicitly:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.5.0
+    flowduino/ESPressio-Event@^5.6.2
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 

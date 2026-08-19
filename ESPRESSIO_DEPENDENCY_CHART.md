@@ -18,7 +18,7 @@ This distinction is important to the ESPressio architecture. Optional integratio
 
 ---
 
-## ESPressio Units 0.2.0
+## ESPressio Units 0.2.1
 
 **Required ESPressio dependencies: none.**
 
@@ -45,7 +45,7 @@ Serializable Unit type
 
 ---
 
-## ESPressio Observable >= 3.0.0
+## ESPressio Observable >= 3.0.0 < 4.0.0
 
 **Required ESPressio dependencies: none represented in this chart.**
 
@@ -78,7 +78,7 @@ ESPressio Timing can operate with Serializable Unit time representations because
 
 ---
 
-## ESPressio Sockets 0.2.0
+## ESPressio Sockets 0.2.2
 
 **Required ESPressio dependencies: none.**
 
@@ -114,12 +114,12 @@ ESPressio Timing continues to own clock discipline, synchronization calculations
 
 ---
 
-## ESPressio Timing 2.2.0
+## ESPressio Timing 2.2.1
 
 **Required ESPressio dependencies:**
 
-- ESPressio Units >= 0.2.0;
-- ESPressio Observable >= 3.0.0.
+- ESPressio Units >= 0.2.1 < 1.0.0;
+- ESPressio Observable >= 3.0.0 < 4.0.0.
 
 ### ESPressio Timing → ESPressio Units — required
 
@@ -139,12 +139,12 @@ The synchronous Observer layer also provides the source notifications consumed b
 
 ---
 
-## ESPressio Threads 3.1.0
+## ESPressio Threads 3.1.1
 
 **Required ESPressio dependencies:**
 
-- ESPressio Timing >= 2.0.0;
-- ESPressio Observable >= 3.0.0.
+- ESPressio Timing >= 2.2.0 < 3.0.0;
+- ESPressio Observable >= 3.0.0 < 4.0.0.
 
 ### ESPressio Threads → ESPressio Timing — required
 
@@ -164,11 +164,11 @@ ESPressio Event can optionally bridge them into asynchronous Events, but Threads
 
 ---
 
-## ESPressio ESP-Now 0.2.0
+## ESPressio ESP-Now 0.2.2
 
 **Required ESPressio dependencies:**
 
-- ESPressio Timing >= 2.1.0.
+- ESPressio Timing >= 2.2.0 < 3.0.0.
 
 ### ESPressio ESP-Now → ESPressio Timing — required
 
@@ -190,13 +190,13 @@ When `ESPNowEventTransport` is selected, the application also acquires the Seria
 
 ---
 
-## ESPressio Event 5.4.0
+## ESPressio Event 5.6.2
 
 **Required ESPressio dependencies:**
 
-- ESPressio Threads >= 3.1.0;
-- ESPressio Observable >= 3.0.0;
-- ESPressio Timing >= 2.2.0.
+- ESPressio Threads >= 3.1.0 < 4.0.0;
+- ESPressio Observable >= 3.0.0 < 4.0.0;
+- ESPressio Timing >= 2.2.0 < 3.0.0.
 
 Event currently sits at the deepest point in the core ESPressio dependency hierarchy represented here.
 
