@@ -12,7 +12,9 @@ optional transport-neutral Serializable Event routing.
 
 ## Latest Stable Version
 
-The latest stable version is **5.4.0**.
+The latest stable version is **5.5.0**.
+
+For release-by-release history, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Compatibility
 
@@ -105,7 +107,7 @@ library:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.4.0
+    flowduino/ESPressio-Event@^5.5.0
 ```
 
 The mandatory dependency graph is:
@@ -935,7 +937,7 @@ Serializable explicitly:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.4.0
+    flowduino/ESPressio-Event@^5.5.0
     flowduino/ESPressio-Serializable@^0.9.0
 ```
 
@@ -1287,6 +1289,82 @@ surface for transport registration, type/route lifecycle, and
 inbound/outbound diagnostics.
 
 ------------------------------------------------------------------------
+
+
+## Event Transport Transaction Observation
+
+Version 5.5 adds a unified, transport-neutral observation surface for complete Event Transport transaction activity.
+
+Existing `IEventTransportManagerObserver` callbacks remain available and unchanged. The interface additionally exposes:
+
+```cpp
+virtual void OnEventTransportTransaction(
+    const EventTransportTransaction& transaction
+) {}
+```
+
+`EventTransportTransaction` is an immutable callback snapshot describing the transaction stage and the context that is available at that stage. It can include:
+
+```text
+transaction stage
+inbound / outbound direction
+stable Event type ID
+stable Event type name
+Serializable schema version
+transport message ID
+concrete IEventTransport pointer
+borrowed IEvent pointer when a local/reconstructed Event exists
+borrowed serialized Binary payload when available
+dispatch method
+Event priority
+local / remote origin
+hop count
+transport handoff acceptance result
+```
+
+Transaction stages include:
+
+```cpp
+EventTransportTransactionStage::OutboundAccepted
+EventTransportTransactionStage::OutboundSerialized
+EventTransportTransactionStage::OutboundHandedToTransport
+EventTransportTransactionStage::InboundAccepted
+EventTransportTransactionStage::InboundRejected
+EventTransportTransactionStage::InboundDeserialized
+EventTransportTransactionStage::InboundDispatched
+EventTransportTransactionStage::Failed
+```
+
+The transaction callback is intended for diagnostics, tracing, monitoring, telemetry, persistence, and similar cross-cutting integrations without coupling ESPressio Event to any particular output mechanism.
+
+For example, a future ESPressio Serial Event Monitor can subscribe once to `EventTransportManager` and observe every Serializable Event Transport transaction without implementing or wrapping a physical Event transport.
+
+### Borrowed lifetime
+
+`EventTransportTransaction::Event` and `EventTransportTransaction::Payload` are **borrowed callback-lifetime references**.
+
+They are valid only for the duration of `OnEventTransportTransaction(...)`. An Observer that needs to retain either representation must copy the required data before returning.
+
+This preserves the existing Event ownership/ref-count contract and avoids diagnostic observers extending Event or transport-buffer lifetime.
+
+### Stable human-readable type identity
+
+The runtime transport registration now retains the stable transport type name declared through:
+
+```cpp
+ESPRESSIO_EVENT_TRANSPORT_TYPE(
+    MyEvent,
+    "com.example.my-event.v1"
+)
+```
+
+Transaction Observers therefore receive both the hashed wire `EventTypeID` and the stable human-readable `EventTypeName`.
+
+### Representation neutrality
+
+Event Transport continues to use ESPressio Serializable Binary payloads on the wire. Transaction observation exposes that already-produced payload where available but does not introduce JSON or another diagnostic representation into Event itself.
+
+A diagnostics/Serial library can decide how to present the transaction—summary, hexadecimal payload, or another representation—without forcing that cost or dependency onto every Event Transport application.
 
 # Migration from 4.x
 

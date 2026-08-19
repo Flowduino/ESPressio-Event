@@ -97,6 +97,17 @@ public:
         uint64_t,
         uint64_t
     ) {}
+
+    /**
+     * Unified, immutable transaction observation callback.
+     *
+     * Any Event/Payload pointers in the supplied snapshot are borrowed and
+     * valid only for the duration of this callback. Observers that need to
+     * retain data must copy it before returning.
+     */
+    virtual void OnEventTransportTransaction(
+        const EventTransportTransaction&
+    ) {}
 };
 
 }

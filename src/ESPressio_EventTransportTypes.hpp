@@ -147,6 +147,50 @@ struct EventTransportBulkOperationResult {
     std::size_t Failed = 0;
 };
 
+class IEvent;
+class IEventTransport;
+
+enum class EventTransportTransactionStage : uint8_t {
+    OutboundAccepted,
+    OutboundSerialized,
+    OutboundHandedToTransport,
+    InboundAccepted,
+    InboundRejected,
+    InboundDeserialized,
+    InboundDispatched,
+    Failed
+};
+
+struct EventTransportTransaction {
+    EventTransportTransactionStage Stage =
+        EventTransportTransactionStage::Failed;
+
+    EventTransportDirection Direction =
+        EventTransportDirection::None;
+
+    uint64_t EventTypeID = 0;
+    std::string_view EventTypeName{};
+    uint32_t SchemaVersion = 0;
+    uint64_t MessageID = 0;
+
+    IEventTransport* Transport = nullptr;
+    const IEvent* Event = nullptr;
+
+    const uint8_t* Payload = nullptr;
+    std::size_t PayloadSize = 0;
+
+    EventDispatchMethod DispatchMethod =
+        EventDispatchMethod::Queue;
+
+    EventPriority Priority =
+        EventPriority::Normal;
+
+    EventOrigin Origin = EventOrigin::Local;
+    uint8_t HopCount = 0;
+
+    bool TransportAccepted = false;
+};
+
 template<typename TEvent>
 struct EventTransportTypeTraits {
     static constexpr std::string_view Name{};

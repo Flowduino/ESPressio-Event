@@ -12,6 +12,29 @@ Versioning](https://semver.org/).
 > had little or no release-note detail, the entry is intentionally terse
 > rather than inferring unsupported intent.
 
+## [5.5.0] - 2026-08-19
+
+### Added
+
+- Added **Event Transport Transaction Observation** as a unified diagnostics/tracing surface.
+- Added `EventTransportTransactionStage`.
+- Added immutable callback snapshots through `EventTransportTransaction`.
+- Added `IEventTransportManagerObserver::OnEventTransportTransaction(...)`.
+- Added stable human-readable Event transport type names to runtime registrations and transaction snapshots.
+- Added transaction-stage notifications for outbound acceptance, serialization, transport handoff, inbound acceptance/rejection, deserialization, local dispatch, and processing failures.
+- Exposed borrowed Event and Binary payload context at transaction stages where those representations exist.
+
+### Changed
+
+- Extended the Event Transport Observer interface without removing or changing existing Observer callbacks.
+- Documented Event/payload pointers in transaction snapshots as callback-lifetime-only borrowed references.
+- Kept transaction observation representation-neutral; Event itself does not acquire JSON/diagnostic-output dependencies.
+
+### Fixed
+
+- Corrected `EventTransportManager::Initialize()` for ESPressio Threads 3.1 by returning `ThreadInitializationStatus` as required by the base `Thread` interface.
+- Updated Event Transport Manager startup state handling to use the current Threads `Running` state rather than the obsolete `Started` state.
+
 ## \[5.4.0\] - 2026-08-19
 
 ### Added

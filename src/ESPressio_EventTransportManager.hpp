@@ -41,6 +41,7 @@ class EventTransportManager final :
 private:
     struct Registration {
         uint64_t TypeID = 0;
+        std::string_view TypeName{};
         uint32_t SchemaVersion = 1;
 
         std::type_index RuntimeType =
@@ -338,6 +339,19 @@ private:
     }
 
 
+    void NotifyTransaction(
+        const EventTransportTransaction& transaction
+    ) {
+        _observable->Notify(
+            [&](IEventTransportManagerObserver* observer) {
+                observer->OnEventTransportTransaction(
+                    transaction
+                );
+            }
+        );
+    }
+
+
     void ProcessOutbound(
         OutboundWork work
     ) {
@@ -346,6 +360,24 @@ private:
                 nullptr ||
             !work.RegistrationSnapshot.Serialize
         ) {
+            NotifyTransaction({
+                EventTransportTransactionStage::Failed,
+                EventTransportDirection::Outbound,
+                work.TypeID,
+                work.RegistrationSnapshot.TypeName,
+                work.RegistrationSnapshot.SchemaVersion,
+                work.MessageID,
+                work.Transport,
+                work.Event,
+                nullptr,
+                0,
+                work.Method,
+                work.Priority,
+                EventOrigin::Local,
+                0,
+                false
+            });
+
             ReleaseOutbound(work);
             return;
         }
@@ -360,9 +392,45 @@ private:
                     payload
                 )
         ) {
+            NotifyTransaction({
+                EventTransportTransactionStage::Failed,
+                EventTransportDirection::Outbound,
+                work.TypeID,
+                work.RegistrationSnapshot.TypeName,
+                work.RegistrationSnapshot.SchemaVersion,
+                work.MessageID,
+                work.Transport,
+                work.Event,
+                nullptr,
+                0,
+                work.Method,
+                work.Priority,
+                EventOrigin::Local,
+                0,
+                false
+            });
+
             ReleaseOutbound(work);
             return;
         }
+
+        NotifyTransaction({
+            EventTransportTransactionStage::OutboundSerialized,
+            EventTransportDirection::Outbound,
+            work.TypeID,
+            work.RegistrationSnapshot.TypeName,
+            work.RegistrationSnapshot.SchemaVersion,
+            work.MessageID,
+            work.Transport,
+            work.Event,
+            payload.data(),
+            payload.size(),
+            work.Method,
+            work.Priority,
+            EventOrigin::Local,
+            0,
+            false
+        });
 
         EventTransportEnvelope
             envelope;
@@ -423,6 +491,24 @@ private:
             }
         );
 
+        NotifyTransaction({
+            EventTransportTransactionStage::OutboundHandedToTransport,
+            EventTransportDirection::Outbound,
+            work.TypeID,
+            work.RegistrationSnapshot.TypeName,
+            work.RegistrationSnapshot.SchemaVersion,
+            work.MessageID,
+            work.Transport,
+            work.Event,
+            payload.data(),
+            payload.size(),
+            work.Method,
+            work.Priority,
+            EventOrigin::Local,
+            0,
+            accepted
+        });
+
         ReleaseOutbound(work);
     }
 
@@ -462,6 +548,23 @@ private:
             );
 
         if (event == nullptr) {
+            NotifyTransaction({
+                EventTransportTransactionStage::Failed,
+                EventTransportDirection::Inbound,
+                envelope.EventTypeID,
+                registration.TypeName,
+                envelope.SchemaVersion,
+                envelope.MessageID,
+                work.Transport,
+                nullptr,
+                payload,
+                envelope.PayloadLength,
+                static_cast<EventDispatchMethod>(envelope.DispatchMethod),
+                static_cast<EventPriority>(envelope.Priority),
+                EventOrigin::Remote,
+                envelope.HopCount,
+                false
+            });
             return;
         }
 
@@ -474,6 +577,24 @@ private:
                     );
             }
         );
+
+        NotifyTransaction({
+            EventTransportTransactionStage::InboundDeserialized,
+            EventTransportDirection::Inbound,
+            envelope.EventTypeID,
+            registration.TypeName,
+            envelope.SchemaVersion,
+            envelope.MessageID,
+            work.Transport,
+            event,
+            payload,
+            envelope.PayloadLength,
+            static_cast<EventDispatchMethod>(envelope.DispatchMethod),
+            static_cast<EventPriority>(envelope.Priority),
+            EventOrigin::Remote,
+            envelope.HopCount,
+            true
+        });
 
         EventDispatchContext
             context;
@@ -542,6 +663,24 @@ private:
                     );
             }
         );
+
+        NotifyTransaction({
+            EventTransportTransactionStage::InboundDispatched,
+            EventTransportDirection::Inbound,
+            envelope.EventTypeID,
+            registration.TypeName,
+            envelope.SchemaVersion,
+            envelope.MessageID,
+            work.Transport,
+            nullptr,
+            payload,
+            envelope.PayloadLength,
+            method,
+            priority,
+            EventOrigin::Remote,
+            envelope.HopCount,
+            true
+        });
     }
 
 
@@ -702,6 +841,11 @@ private:
             EventTransportTypeID<
                 TEvent
             >();
+
+        proposed.TypeName =
+            EventTransportTypeTraits<
+                TEvent
+            >::Name;
 
         proposed.SchemaVersion =
             TEvent::GetSchemaVersion();
@@ -1245,9 +1389,12 @@ public:
     }
 
 
-    void Initialize() override {
+    Threads::ThreadInitializationStatus
+    Initialize() override {
         if (_initialized) {
-            return;
+            return
+                Threads::ThreadInitializationStatus::
+                    AlreadyInitialized;
         }
 
         _eventManagerObserverHandle =
@@ -1258,27 +1405,63 @@ public:
                 );
 
         if (!_eventManagerObserverHandle) {
-            return;
+            return
+                Threads::ThreadInitializationStatus::
+                    InitializationException;
+        }
+
+        const auto initializationStatus =
+            Threads::Thread::Initialize();
+
+        if (
+            initializationStatus !=
+                Threads::ThreadInitializationStatus::
+                    Success &&
+            initializationStatus !=
+                Threads::ThreadInitializationStatus::
+                    AlreadyInitialized
+        ) {
+            _eventManagerObserverHandle.reset();
+            return initializationStatus;
         }
 
         if (
             GetThreadState() ==
-            Threads::ThreadState::
-                Uninitialized
+                Threads::ThreadState::Initialized ||
+            GetThreadState() ==
+                Threads::ThreadState::Paused
         ) {
-            Threads::Thread::
-                Initialize();
+            const auto startStatus =
+                Threads::Thread::Start();
+
+            if (
+                startStatus !=
+                    Threads::ThreadInitializationStatus::
+                        Success &&
+                startStatus !=
+                    Threads::ThreadInitializationStatus::
+                        AlreadyInitialized
+            ) {
+                _eventManagerObserverHandle.reset();
+                return startStatus;
+            }
         }
 
         if (
             GetThreadState() !=
-            Threads::ThreadState::
-                Started
+            Threads::ThreadState::Running
         ) {
-            Start();
+            _eventManagerObserverHandle.reset();
+            return
+                Threads::ThreadInitializationStatus::
+                    InvalidState;
         }
 
         _initialized = true;
+
+        return
+            Threads::ThreadInitializationStatus::
+                Success;
     }
 
 
@@ -3119,6 +3302,24 @@ public:
                         );
                 }
             );
+
+            NotifyTransaction({
+                EventTransportTransactionStage::OutboundAccepted,
+                EventTransportDirection::Outbound,
+                typeID,
+                registrationSnapshot.TypeName,
+                registrationSnapshot.SchemaVersion,
+                messageID,
+                transport,
+                event,
+                nullptr,
+                0,
+                method,
+                priority,
+                EventOrigin::Local,
+                0,
+                false
+            });
         }
 
         Wake();
@@ -3167,12 +3368,32 @@ public:
                 }
             );
 
+            NotifyTransaction({
+                EventTransportTransactionStage::InboundRejected,
+                EventTransportDirection::Inbound,
+                0,
+                {},
+                0,
+                0,
+                transport,
+                nullptr,
+                nullptr,
+                0,
+                EventDispatchMethod::Queue,
+                EventPriority::Normal,
+                EventOrigin::Remote,
+                0,
+                false
+            });
+
             return;
         }
 
         (void)payload;
 
         bool accepted = false;
+        std::string_view typeName{};
+        uint32_t schemaVersion = envelope.SchemaVersion;
 
         {
             std::lock_guard<
@@ -3199,6 +3420,17 @@ public:
 
                 if (
                     found !=
+                    _registrations.end()
+                ) {
+                    typeName =
+                        found->second.TypeName;
+
+                    schemaVersion =
+                        found->second.SchemaVersion;
+                }
+
+                if (
+                    found !=
                         _registrations.end() &&
                     HasDirection(
                         found->second.
@@ -3209,6 +3441,7 @@ public:
                             Inbound
                     )
                 ) {
+
                     _inbound.push_back({
                         transport,
                         envelope.EventTypeID,
@@ -3236,6 +3469,24 @@ public:
                 }
             );
 
+            NotifyTransaction({
+                EventTransportTransactionStage::InboundAccepted,
+                EventTransportDirection::Inbound,
+                envelope.EventTypeID,
+                typeName,
+                schemaVersion,
+                envelope.MessageID,
+                transport,
+                nullptr,
+                payload,
+                envelope.PayloadLength,
+                static_cast<EventDispatchMethod>(envelope.DispatchMethod),
+                static_cast<EventPriority>(envelope.Priority),
+                EventOrigin::Remote,
+                envelope.HopCount,
+                true
+            });
+
             Wake();
         } else {
             _observable->Notify(
@@ -3248,6 +3499,24 @@ public:
                         );
                 }
             );
+
+            NotifyTransaction({
+                EventTransportTransactionStage::InboundRejected,
+                EventTransportDirection::Inbound,
+                envelope.EventTypeID,
+                typeName,
+                envelope.SchemaVersion,
+                envelope.MessageID,
+                transport,
+                nullptr,
+                payload,
+                envelope.PayloadLength,
+                static_cast<EventDispatchMethod>(envelope.DispatchMethod),
+                static_cast<EventPriority>(envelope.Priority),
+                EventOrigin::Remote,
+                envelope.HopCount,
+                false
+            });
         }
     }
 };
