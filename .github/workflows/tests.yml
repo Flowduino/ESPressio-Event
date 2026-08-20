@@ -19,12 +19,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: main
+          ref: 2.2.2
           path: ESPressio_Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Units
-          ref: main
+          ref: 0.2.1
           path: ESPressio-Units
       - name: Configure
         run: cmake -S ESPressio-Event/tests -B build
@@ -52,17 +52,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Units
-          ref: main
+          ref: 0.2.1
           path: project/dependencies/ESPressio-Units
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: main
+          ref: 2.2.2
           path: project/dependencies/ESPressio-Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Threads
-          ref: main
+          ref: 3.1.2
           path: project/dependencies/ESPressio-Threads
       - uses: actions/checkout@v4
         with:
@@ -104,9 +104,18 @@ jobs:
           build_unflags =
               -std=gnu++11
               -fno-rtti
-          lib_extra_dirs = ../dependencies
+          lib_ldf_mode = deep+
           lib_deps =
               ../ESPressio-Event
+              ../dependencies/ESPressio-Observable
+              ../dependencies/ESPressio-Serializable
+              ../dependencies/ESPressio-Units
+              ../dependencies/ESPressio-Timing
+              ../dependencies/ESPressio-Threads
+              ../dependencies/ESPressio-Security
+              ../dependencies/ESPressio-Command
+              ../dependencies/ESPressio-Sockets
+              ../dependencies/ESPressio-ESP-Now
           EOF
           cat > project/compile/src/main.cpp <<'EOF'
           #include <Arduino.h>
