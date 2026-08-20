@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <memory>
 #include <mutex>
 #include <typeindex>
 #include <unordered_map>
@@ -40,10 +41,15 @@ namespace ESPressio {
                         IEventReceiver*
                     >;
 
+                using EventReceiverBucketSnapshot =
+                    std::shared_ptr<
+                        const EventReceiverBucket
+                    >;
+
                 using EventReceiverTypeMap =
                     std::unordered_map<
                         std::type_index,
-                        EventReceiverBucket
+                        EventReceiverBucketSnapshot
                     >;
 
 
@@ -54,7 +60,7 @@ namespace ESPressio {
                     _eventReceiversMutex;
 
 
-                EventReceiverBucket
+                EventReceiverBucketSnapshot
                 GetEventTypeBucketSnapshot(
                     std::type_index type
                 ) const {
@@ -72,7 +78,7 @@ namespace ESPressio {
                     return
                         found ==
                             _eventReceivers.end()
-                            ? EventReceiverBucket()
+                            ? EventReceiverBucketSnapshot{}
                             : found->second;
                 }
 
@@ -120,10 +126,14 @@ namespace ESPressio {
                                     )
                                 );
 
+                            if (!receivers) {
+                                return;
+                            }
+
                             for (
                                 IEventReceiver*
                                     receiver :
-                                receivers
+                                *receivers
                             ) {
                                 if (
                                     receiver ==
@@ -180,23 +190,45 @@ namespace ESPressio {
                         _eventReceiversMutex
                     );
 
-                    auto& bucket =
-                        _eventReceivers[
+                    EventReceiverBucket bucket;
+
+                    const auto found =
+                        _eventReceivers.find(
                             type
-                        ];
+                        );
+
+                    if (
+                        found !=
+                            _eventReceivers.end() &&
+                        found->second
+                    ) {
+                        bucket =
+                            *found->second;
+                    }
 
                     if (
                         std::find(
                             bucket.begin(),
                             bucket.end(),
                             receiver
-                        ) ==
+                        ) !=
                         bucket.end()
                     ) {
-                        bucket.push_back(
-                            receiver
-                        );
+                        return;
                     }
+
+                    bucket.push_back(
+                        receiver
+                    );
+
+                    _eventReceivers[
+                        type
+                    ] =
+                        std::make_shared<
+                            const EventReceiverBucket
+                        >(
+                            std::move(bucket)
+                        );
                 }
 
 
@@ -217,13 +249,14 @@ namespace ESPressio {
 
                     if (
                         found ==
-                        _eventReceivers.end()
+                            _eventReceivers.end() ||
+                        !found->second
                     ) {
                         return;
                     }
 
-                    auto& bucket =
-                        found->second;
+                    EventReceiverBucket bucket =
+                        *found->second;
 
                     bucket.erase(
                         std::remove(
@@ -238,6 +271,15 @@ namespace ESPressio {
                         _eventReceivers.erase(
                             found
                         );
+                    } else {
+                        _eventReceivers[
+                            type
+                        ] =
+                            std::make_shared<
+                                const EventReceiverBucket
+                            >(
+                                std::move(bucket)
+                            );
                     }
                 }
         };
