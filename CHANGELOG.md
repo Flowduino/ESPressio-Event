@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.7.1 — 2026-08-20
+
+### Changed
+- Raised the required ESPressio Threads dependency floor from 3.1.1 to 3.1.2.
+- Raised the required ESPressio Timing dependency floor from 2.2.1 to 2.2.2.
+- Retained the direct ESPressio Observable minimum at 3.0.1 and the optional Serializable integration baseline at 0.10.0.
+- Updated package and ESP-IDF component version metadata for Event 5.7.1.
+
+### Compatibility
+- This is a dependency-maintenance patch release only.
+- No Event, EventThread, Listener, Observer, Event Transport, runtime Serializable Event, Event Bridge, routing, or wire-protocol interfaces changed.
+
 ## 5.7.0 — 2026-08-20
 
 ### Added
