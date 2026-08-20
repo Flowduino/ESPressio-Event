@@ -22,9 +22,10 @@ jobs:
           from pathlib import Path
           path = Path('README.md')
           text = path.read_text()
-          start = text.index('## Latest Stable Version')
-          end = text.index('## Compatibility', start)
-          current = """## Current Version — 5.8.1
+          start = text.find('## Latest Stable Version')
+          end = text.find('## Compatibility', start)
+          if start >= 0 and end > start:
+              current = """## Current Version — 5.8.1
 
 ESPressio Event 5.8.1 is a dependency-maintenance patch over 5.8.0. It retains the expanded Observable-to-Event bridge surface while refreshing dependency baselines.
 
@@ -47,18 +48,12 @@ Optional observer bridge sources
 Transport-specific Event bridges for Sockets and ESP-Now are retained for 5.8.x compatibility, but their reciprocal optional dependency edges are documented for future downstream relocation.
 
 """
-          text = text[:start] + current + text[end:]
-          replacements = [
-              ('flowduino/ESPressio-Event@^5.7.1', 'flowduino/ESPressio-Event@^5.8.1'),
-              ('ESPressio Event 5.7.1\n    |\n    +-- ESPressio Threads >= 3.1.2 < 4.0.0', 'ESPressio Event 5.8.1\n    |\n    +-- ESPressio Threads >= 3.1.3 < 4.0.0'),
-              ('+-- ESPressio Timing >= 2.2.2 < 3.0.0', '+-- ESPressio Timing >= 2.2.3 < 3.0.0'),
-              ('The 5.8.0 development branch retains the same mandatory graph. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.', 'Event 5.8.1 retains the same dependency shape. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.'),
-              ('required only when an application explicitly opts into Serializable\nEvents or Event Transport.', 'required only when an application explicitly opts into Serializable\nEvents or Event Transport. The validated current baseline is ESPressio Serializable >= 0.10.1 < 1.0.0.'),
-          ]
-          for old, new in replacements:
-              if old not in text:
-                  raise SystemExit(f'missing expected README text: {old}')
-              text = text.replace(old, new, 1)
+              text = text[:start] + current + text[end:]
+          text = text.replace('flowduino/ESPressio-Event@^5.7.1', 'flowduino/ESPressio-Event@^5.8.1', 1)
+          text = text.replace('ESPressio Event 5.7.1\n    |\n    +-- ESPressio Threads >= 3.1.2 < 4.0.0', 'ESPressio Event 5.8.1\n    |\n    +-- ESPressio Threads >= 3.1.3 < 4.0.0', 1)
+          text = text.replace('+-- ESPressio Timing >= 2.2.2 < 3.0.0', '+-- ESPressio Timing >= 2.2.3 < 3.0.0', 1)
+          text = text.replace('The 5.8.0 development branch retains the same mandatory graph. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.', 'Event 5.8.1 retains the same dependency shape. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.', 1)
+          text = text.replace('required only when an application explicitly opts into Serializable\nEvents or Event Transport.', 'required only when an application explicitly opts into Serializable\nEvents or Event Transport. The validated current baseline is ESPressio Serializable >= 0.10.1 < 1.0.0.', 1)
           path.write_text(text)
       - name: Commit README
         run: |
