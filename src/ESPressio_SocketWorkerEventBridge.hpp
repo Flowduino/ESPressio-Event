@@ -3,7 +3,7 @@
 #include <ESPressio_ISocketWorkerObserver.hpp>
 #include <ESPressio_SocketWorker.hpp>
 
-#include "ESPressio_SocketEvents.hpp"
+#include "ESPressio_SocketWorkerEvents.hpp"
 
 namespace ESPressio::Event {
 
