@@ -46,11 +46,6 @@ jobs:
           path: project/dependencies/ESPressio-Observable
       - uses: actions/checkout@v4
         with:
-          repository: Flowduino/ESPressio-Serializable
-          ref: 0.10.0
-          path: project/dependencies/ESPressio-Serializable
-      - uses: actions/checkout@v4
-        with:
           repository: Flowduino/ESPressio-Units
           ref: 0.2.1
           path: project/dependencies/ESPressio-Units
@@ -89,7 +84,7 @@ jobs:
           python-version: '3.x'
       - name: Install PlatformIO
         run: pip install platformio
-      - name: Create compile project
+      - name: Create bridge compile project
         shell: bash
         run: |
           mkdir -p project/compile/src
@@ -101,91 +96,31 @@ jobs:
           build_flags =
               -std=gnu++17
               -frtti
+              -I../dependencies/ESPressio-Security/src
+              -I../dependencies/ESPressio-Command/src
+              -I../dependencies/ESPressio-Sockets/src
+              -I../dependencies/ESPressio-ESP-Now/src
           build_unflags =
               -std=gnu++11
               -fno-rtti
           lib_ldf_mode = deep+
           lib_deps =
-              ../ESPressio-Event
               ../dependencies/ESPressio-Observable
-              ../dependencies/ESPressio-Serializable
               ../dependencies/ESPressio-Units
               ../dependencies/ESPressio-Timing
               ../dependencies/ESPressio-Threads
-              ../dependencies/ESPressio-Security
-              ../dependencies/ESPressio-Command
-              ../dependencies/ESPressio-Sockets
-              ../dependencies/ESPressio-ESP-Now
+              ../ESPressio-Event
           EOF
           cat > project/compile/src/main.cpp <<'EOF'
           #include <Arduino.h>
-          #include <ESPressio_EventThread.hpp>
-          #include <ESPressio_Event_Serializable.hpp>
-          #include <ESPressio_EventTransport.hpp>
           #include <ESPressio_TransportSecurityEventBridge.hpp>
           #include <ESPressio_CommandRegistryEventBridge.hpp>
           #include <ESPressio_SocketWorkerEventBridge.hpp>
           #include <ESPressio_SocketSecuritySessionEventBridge.hpp>
           #include <ESPressio_ESPNowTransportEventBridge.hpp>
 
-          class CompileEvent final :
-              public ESPressio::Event::SerializableEvent<CompileEvent> {
-          public:
-              uint32_t Value = 7;
-              ESPRESSIO_SERIALIZABLE_TYPE(CompileEvent)
-              ESPRESSIO_SERIALIZABLE_SCHEMA_VERSION(1)
-              ESPRESSIO_SERIALIZABLE_PROPERTIES(
-                  ESPRESSIO_PROPERTY("value", Value)
-              )
-          };
-
-          ESPRESSIO_EVENT_TRANSPORT_TYPE(
-              CompileEvent,
-              "flowduino.ci.compile.v1"
-          )
-
-          class CompileTransport final :
-              public ESPressio::Event::IEventTransport {
-              ESPressio::Event::IEventTransportReceiver* receiver = nullptr;
-          public:
-              bool Send(const ESPressio::Event::EventTransportPacket&) override {
-                  return true;
-              }
-              void SetReceiver(
-                  ESPressio::Event::IEventTransportReceiver* value
-              ) override {
-                  receiver = value;
-              }
-          };
-
-          class CompileListener final : public ESPressio::Event::EventThread {
-              ESPressio::Event::EventListenerHandlePtr handle;
-          public:
-              CompileListener() : ESPressio::Event::EventThread(false) {}
-              void Register() {
-                  handle = RegisterListener<CompileEvent>(
-                      [](CompileEvent*,
-                         ESPressio::Event::EventDispatchMethod,
-                         ESPressio::Event::EventPriority) {}
-                  );
-              }
-          };
-
-          CompileTransport transport;
-          CompileListener listener;
-
-          void setup() {
-              auto& manager =
-                  ESPressio::Event::EventTransportManager::GetInstance();
-              manager.RegisterTransport(&transport);
-              manager.RegisterBidirectionalEvent<CompileEvent>(&transport);
-              manager.Initialize();
-              listener.Register();
-              auto* event = new CompileEvent();
-              event->Queue();
-          }
-
+          void setup() {}
           void loop() {}
           EOF
-      - name: Compile ESP32 target and optional bridges
+      - name: Compile ESP32 optional bridges
         run: pio run -d project/compile
