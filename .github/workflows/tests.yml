@@ -113,6 +113,7 @@ jobs:
           EOF
           cat > project/compile/src/main.cpp <<'EOF'
           #include <Arduino.h>
+          #include <WiFi.h>
           #include <ESPressio_TransportSecurityEventBridge.hpp>
           #include <ESPressio_CommandRegistryEventBridge.hpp>
           #include <ESPressio_SocketWorkerEventBridge.hpp>
