@@ -19,12 +19,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: feature/5-units-0.2.2-dependency-refresh
+          ref: 2.2.3
           path: ESPressio_Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Units
-          ref: feature/2-serializable-0.10.1-dependency-refresh
+          ref: 0.2.2
           path: ESPressio-Units
       - name: Configure
         run: cmake -S ESPressio-Event/tests -B build
@@ -47,17 +47,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Units
-          ref: feature/2-serializable-0.10.1-dependency-refresh
+          ref: 0.2.2
           path: project/dependencies/ESPressio-Units
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: feature/5-units-0.2.2-dependency-refresh
+          ref: 2.2.3
           path: project/dependencies/ESPressio-Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Threads
-          ref: feature/45-timing-2.2.3-dependency-refresh
+          ref: 3.1.3
           path: project/dependencies/ESPressio-Threads
       - uses: actions/checkout@v4
         with:
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-ESP-Now
-          ref: feature/10-timing-2.2.3-dependency-refresh
+          ref: 0.5.1
           path: project/dependencies/ESPressio-ESP-Now
       - uses: actions/setup-python@v5
         with:
