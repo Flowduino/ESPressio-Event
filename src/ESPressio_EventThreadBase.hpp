@@ -1,7 +1,20 @@
 #pragma once
 
+#include <atomic>
+
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include <ESPressio_Thread.hpp>
 #include "ESPressio_EventReceiver.hpp"
+
+#ifndef ESPRESSIO_EVENT_THREAD_DEFAULT_PRIORITY
+    #define ESPRESSIO_EVENT_THREAD_DEFAULT_PRIORITY 2
+#endif
+
+#ifndef ESPRESSIO_EVENT_THREAD_DEFAULT_CORE_ID
+    #define ESPRESSIO_EVENT_THREAD_DEFAULT_CORE_ID 0
+#endif
 
 using namespace ESPressio::Threads;
 
@@ -15,25 +28,80 @@ namespace ESPressio {
 
         class EventThreadBase : public Thread, public EventReceiver, public IEventThreadBase {
             private:
-                SemaphoreHandle_t _semaphore = xSemaphoreCreateBinary();
+                std::atomic<TaskHandle_t>
+                    _notificationTask{
+                        nullptr
+                    };
+
             protected:
                 void OnLoop() override {
-                    xSemaphoreTake(_semaphore, portMAX_DELAY);
-                    WithEvents([&](IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) {
-                        OnEvent(event, dispatchMethod, priority);
-                    });
+                    _notificationTask.store(
+                        xTaskGetCurrentTaskHandle(),
+                        std::memory_order_release
+                    );
+
+                    if (GetPendingEventCount() == 0) {
+                        ulTaskNotifyTake(
+                            pdTRUE,
+                            portMAX_DELAY
+                        );
+                    } else {
+                        ulTaskNotifyTake(
+                            pdTRUE,
+                            0
+                        );
+                    }
+
+                    WithEvents(
+                        [&](
+                            IEvent* event,
+                            EventDispatchMethod dispatchMethod,
+                            EventPriority priority
+                        ) {
+                            OnEvent(
+                                event,
+                                dispatchMethod,
+                                priority
+                            );
+                        }
+                    );
                 }
 
-                virtual void OnEvent(IEvent* event, EventDispatchMethod dispatchMethod, EventPriority priority) = 0;
+                virtual void OnEvent(
+                    IEvent* event,
+                    EventDispatchMethod dispatchMethod,
+                    EventPriority priority
+                ) = 0;
 
                 void EventAdded() override {
-                    xSemaphoreGive(_semaphore);
+                    const TaskHandle_t task =
+                        _notificationTask.load(
+                            std::memory_order_acquire
+                        );
+
+                    if (task != nullptr) {
+                        xTaskNotifyGive(
+                            task
+                        );
+                    }
                 }
+
             public:
-                EventThreadBase(bool freeOnTerminate) : Thread(freeOnTerminate) { }
+                EventThreadBase(bool freeOnTerminate) :
+                    Thread(freeOnTerminate) {
+                    SetPriority(
+                        ESPRESSIO_EVENT_THREAD_DEFAULT_PRIORITY
+                    );
+                    SetCoreID(
+                        ESPRESSIO_EVENT_THREAD_DEFAULT_CORE_ID
+                    );
+                }
 
                 virtual ~EventThreadBase() {
-                    vSemaphoreDelete(_semaphore);
+                    _notificationTask.store(
+                        nullptr,
+                        std::memory_order_release
+                    );
                 }
         };
 

@@ -9,7 +9,6 @@
 #include <limits>
 #include <mutex>
 #include <typeindex>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -57,11 +56,23 @@ namespace ESPressio {
                 };
 
                 using EventDispatchCollection = std::vector<PendingEvent>;
-                using EventCollection = std::unordered_map<
-                    EventPriority, EventDispatchCollection
-                >;
+
+                static constexpr size_t PriorityCount =
+                    static_cast<size_t>(EventPriority::High) + 1;
+
+                using EventCollection =
+                    std::array<
+                        EventDispatchCollection,
+                        PriorityCount
+                    >;
 
                 static constexpr size_t CapacitySampleCount = 16;
+
+                static constexpr size_t PriorityIndex(
+                    EventPriority priority
+                ) {
+                    return static_cast<size_t>(priority);
+                }
 
                 mutable std::mutex _eventsMutex;
                 std::condition_variable _capacityAvailable;
@@ -158,22 +169,29 @@ namespace ESPressio {
                     size_t selectedIndex = 0;
                     uint64_t selectedSequence =
                         std::numeric_limits<uint64_t>::max();
+
                     auto consider = [&](EventCollection& collections) {
-                        for (auto& entry : collections) {
+                        for (auto& collection : collections) {
                             for (size_t index = 0;
-                                index < entry.second.size(); ++index) {
-                                if (entry.second[index].sequence <
+                                index < collection.size(); ++index) {
+                                if (collection[index].sequence <
                                     selectedSequence) {
-                                    selected = &entry.second;
+                                    selected = &collection;
                                     selectedIndex = index;
                                     selectedSequence =
-                                        entry.second[index].sequence;
+                                        collection[index].sequence;
                                 }
                             }
                         }
                     };
+
                     consider(_priorityQueues);
                     consider(_priorityStacks);
+
+                    if (selected == nullptr) {
+                        return PendingEvent{};
+                    }
+
                     PendingEvent removed = (*selected)[selectedIndex];
                     selected->erase(selected->begin() + selectedIndex);
                     --_pendingEventCount;
@@ -181,27 +199,29 @@ namespace ESPressio {
                 }
 
                 PendingEvent RemoveLowestPriorityLocked(bool& removed) {
-                    for (int priorityID = 0;
-                        priorityID <= static_cast<int>(EventPriority::High);
+                    for (size_t priorityID = 0;
+                        priorityID < PriorityCount;
                         ++priorityID) {
-                        const EventPriority priority =
-                            static_cast<EventPriority>(priorityID);
                         auto removeFrom = [&](EventCollection& collections) {
-                            const auto found = collections.find(priority);
-                            if (found == collections.end() ||
-                                found->second.empty()) {
+                            EventDispatchCollection& collection =
+                                collections[priorityID];
+
+                            if (collection.empty()) {
                                 return PendingEvent{};
                             }
-                            PendingEvent result = found->second.front();
-                            found->second.erase(found->second.begin());
+
+                            PendingEvent result = collection.front();
+                            collection.erase(collection.begin());
                             removed = true;
                             --_pendingEventCount;
                             return result;
                         };
+
                         PendingEvent result = removeFrom(_priorityQueues);
                         if (removed) {
                             return result;
                         }
+
                         result = removeFrom(_priorityStacks);
                         if (removed) {
                             return result;
@@ -287,9 +307,13 @@ namespace ESPressio {
                             method == EventDispatchMethod::Queue
                                 ? _priorityQueues
                                 : _priorityStacks;
-                        collections[priority].push_back(PendingEvent{
+
+                        collections[
+                            PriorityIndex(priority)
+                        ].push_back(PendingEvent{
                             event, NextSequence(_nextSequence)
                         });
+
                         ++_pendingEventCount;
                         _peakPendingEventCount = std::max(
                             _peakPendingEventCount,
@@ -320,14 +344,19 @@ namespace ESPressio {
                     )>& callback
                 ) {
                     EventDispatchCollection pending;
+                    const size_t priorityIndex =
+                        PriorityIndex(priority);
+
                     {
                         std::lock_guard<std::mutex> lock(_eventsMutex);
-                        const auto found = collections.find(priority);
-                        if (found == collections.end() ||
-                            found->second.empty()) {
+                        EventDispatchCollection& source =
+                            collections[priorityIndex];
+
+                        if (source.empty()) {
                             return;
                         }
-                        pending.swap(found->second);
+
+                        pending.swap(source);
                         _pendingEventCount -= pending.size();
                         _processingEventCount += pending.size();
                         RecordDrainSizeLocked(pending.size());
@@ -386,7 +415,7 @@ namespace ESPressio {
                     pending.clear();
                     std::lock_guard<std::mutex> lock(_eventsMutex);
                     EventDispatchCollection& destination =
-                        collections[priority];
+                        collections[priorityIndex];
                     if (pending.capacity() > destination.capacity()) {
                         EventDispatchCollection arrivals;
                         arrivals.swap(destination);
@@ -447,8 +476,8 @@ namespace ESPressio {
                     }
                     _capacityAvailable.notify_all();
                     auto release = [](EventCollection& collections) {
-                        for (auto& entry : collections) {
-                            for (PendingEvent& pending : entry.second) {
+                        for (auto& collection : collections) {
+                            for (PendingEvent& pending : collection) {
                                 pending.event->__unref();
                             }
                         }
@@ -514,8 +543,8 @@ namespace ESPressio {
                     std::lock_guard<std::mutex> lock(_eventsMutex);
                     _capacityPolicy = policy;
                     auto apply = [&](EventCollection& collections) {
-                        for (auto& entry : collections) {
-                            ApplyCapacityPolicyLocked(entry.second);
+                        for (auto& collection : collections) {
+                            ApplyCapacityPolicyLocked(collection);
                         }
                     };
                     apply(_priorityQueues);
@@ -533,8 +562,8 @@ namespace ESPressio {
                     std::lock_guard<std::mutex> lock(_eventsMutex);
                     size_t capacity = 0;
                     auto addCapacity = [&](const EventCollection& collections) {
-                        for (const auto& entry : collections) {
-                            capacity += entry.second.capacity();
+                        for (const auto& collection : collections) {
+                            capacity += collection.capacity();
                         }
                     };
                     addCapacity(_priorityQueues);

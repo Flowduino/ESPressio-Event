@@ -245,6 +245,12 @@ namespace ESPressio {
                     Threads::Thread(
                         freeOnTerminate
                     ) {
+                    SetPriority(
+                        ESPRESSIO_EVENT_THREAD_DEFAULT_PRIORITY
+                    );
+                    SetCoreID(
+                        ESPRESSIO_EVENT_THREAD_DEFAULT_CORE_ID
+                    );
                 }
 
 
