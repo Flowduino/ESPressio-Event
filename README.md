@@ -12,7 +12,7 @@ optional transport-neutral Serializable Event routing.
 
 ## Latest Stable Version
 
-The latest stable version is **5.6.2**.
+The latest stable version is **5.7.1**.
 
 For release-by-release history, see [CHANGELOG.md](CHANGELOG.md).
 
@@ -204,19 +204,19 @@ library:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.6.2
+    flowduino/ESPressio-Event@^5.7.1
 ```
 
 The mandatory dependency graph is:
 
 ``` text
-ESPressio Event 5.6.2
+ESPressio Event 5.7.1
     |
-    +-- ESPressio Threads >= 3.1.1 < 4.0.0
+    +-- ESPressio Threads >= 3.1.2 < 4.0.0
     |
-    +-- ESPressio Observable >= 3.0.0 < 4.0.0
+    +-- ESPressio Observable >= 3.0.1 < 4.0.0
     |
-    +-- ESPressio Timing >= 2.2.1 < 3.0.0
+    +-- ESPressio Timing >= 2.2.2 < 3.0.0
 ```
 
 ESPressio Units is available through the Timing dependency stack.
@@ -686,7 +686,7 @@ interested Event receivers without requiring the producer to know those
 receivers.
 
 The Event Manager is process-lifetime FreeRTOS infrastructure. Its task,
-semaphore, dispatcher, and per-Event-type routing structures
+task-notification wakeup, dispatcher, and per-Event-type routing structures
 intentionally remain allocated until device shutdown; this is fixed
 infrastructure rather than leaked per-dispatch Event ownership.
 
@@ -1034,8 +1034,8 @@ Serializable explicitly:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.6.2
-    flowduino/ESPressio-Serializable@^0.9.0
+    flowduino/ESPressio-Event@^5.7.1
+    flowduino/ESPressio-Serializable@^0.10.0
 ```
 
 ## `SerializableEvent`
@@ -1377,7 +1377,10 @@ hop count
 payload length
 ```
 
-The payload uses ESPressio Serializable `BinaryArchive`.
+The payload uses the ESPressio Serializable **ESPB v2 binary wire format**.
+Event 5.7 uses Serializable's direct binary path for the normal same-schema
+transport case, while retaining the existing `BinaryArchive` path as a
+compatibility and schema-migration fallback.
 
 ## EventTransportManager observation
 
@@ -1614,4 +1617,3 @@ HopCount
 ```
 
 This is a compatibility fix only; Event dispatch behaviour and public Event Transport semantics are unchanged.
-
