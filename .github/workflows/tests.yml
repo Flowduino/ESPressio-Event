@@ -64,6 +64,26 @@ jobs:
           repository: Flowduino/ESPressio-Threads
           ref: main
           path: project/dependencies/ESPressio-Threads
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-Security
+          ref: cb5224b3f98174f8b521ff87d92a373d2e97dcf7
+          path: project/dependencies/ESPressio-Security
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-Command
+          ref: 74ea89f9c8895cfaa272bae44d0eba5711a3dbc1
+          path: project/dependencies/ESPressio-Command
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-Sockets
+          ref: 1ecc989968766a40cb4543bee780ac0bcd14a197
+          path: project/dependencies/ESPressio-Sockets
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-ESP-Now
+          ref: 9be036ace02c31986c2c7d2d8283fca4b36d338f
+          path: project/dependencies/ESPressio-ESP-Now
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -89,6 +109,11 @@ jobs:
           #include <ESPressio_EventThread.hpp>
           #include <ESPressio_Event_Serializable.hpp>
           #include <ESPressio_EventTransport.hpp>
+          #include <ESPressio_TransportSecurityEventBridge.hpp>
+          #include <ESPressio_CommandRegistryEventBridge.hpp>
+          #include <ESPressio_SocketWorkerEventBridge.hpp>
+          #include <ESPressio_SocketSecuritySessionEventBridge.hpp>
+          #include <ESPressio_ESPNowTransportEventBridge.hpp>
 
           class CompileEvent final :
               public ESPressio::Event::SerializableEvent<CompileEvent> {
@@ -149,5 +174,5 @@ jobs:
 
           void loop() {}
           EOF
-      - name: Compile ESP32 target
+      - name: Compile ESP32 target and optional bridges
         run: pio run -d project/compile
