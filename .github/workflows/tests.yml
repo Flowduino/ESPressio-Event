@@ -19,12 +19,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: 2.2.2
+          ref: feature/5-units-0.2.2-dependency-refresh
           path: ESPressio_Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Units
-          ref: 0.2.1
+          ref: feature/2-serializable-0.10.1-dependency-refresh
           path: ESPressio-Units
       - name: Configure
         run: cmake -S ESPressio-Event/tests -B build
@@ -47,18 +47,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Units
-          ref: 0.2.1
+          ref: feature/2-serializable-0.10.1-dependency-refresh
           path: project/dependencies/ESPressio-Units
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: 2.2.2
+          ref: feature/5-units-0.2.2-dependency-refresh
           path: project/dependencies/ESPressio-Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Threads
-          ref: 3.1.2
+          ref: feature/45-timing-2.2.3-dependency-refresh
           path: project/dependencies/ESPressio-Threads
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-Serializable
+          ref: 0.10.1
+          path: project/dependencies/ESPressio-Serializable
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Security
@@ -77,7 +82,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-ESP-Now
-          ref: 0.5.0
+          ref: feature/10-timing-2.2.3-dependency-refresh
           path: project/dependencies/ESPressio-ESP-Now
       - uses: actions/setup-python@v5
         with:
@@ -109,11 +114,13 @@ jobs:
               ../dependencies/ESPressio-Units
               ../dependencies/ESPressio-Timing
               ../dependencies/ESPressio-Threads
+              ../dependencies/ESPressio-Serializable
               ../ESPressio-Event
           EOF
           cat > project/compile/src/main.cpp <<'EOF'
           #include <Arduino.h>
           #include <WiFi.h>
+          #include <ESPressio_EventTransport.hpp>
           #include <ESPressio_TransportSecurityEventBridge.hpp>
           #include <ESPressio_CommandRegistryEventBridge.hpp>
           #include <ESPressio_SocketWorkerEventBridge.hpp>
@@ -123,5 +130,5 @@ jobs:
           void setup() {}
           void loop() {}
           EOF
-      - name: Compile ESP32 optional bridges
+      - name: Compile ESP32 Event Transport and optional bridges
         run: pio run -d project/compile
