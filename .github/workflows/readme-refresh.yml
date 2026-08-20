@@ -22,14 +22,11 @@ jobs:
           from pathlib import Path
           path = Path('README.md')
           text = path.read_text()
-
           start = text.index('## Latest Stable Version')
           end = text.index('## Compatibility', start)
-          current = '''## Current Version — 5.8.1
+          current = """## Current Version — 5.8.1
 
-ESPressio Event 5.8.1 is a dependency-maintenance patch over 5.8.0. It retains the expanded Observable-to-Event bridge surface while refreshing the required and optional dependency baselines.
-
-Current dependency baselines:
+ESPressio Event 5.8.1 is a dependency-maintenance patch over 5.8.0. It retains the expanded Observable-to-Event bridge surface while refreshing dependency baselines.
 
 ```text
 Required
@@ -47,62 +44,21 @@ Optional observer bridge sources
     ESPressio ESP-Now >= 0.5.0 < 1.0.0
 ```
 
-The 5.8.1 patch does not add new bridge APIs or alter Event wire formats. It also documents that the Sockets-specific and ESP-Now-specific bridges currently create reciprocal optional dependency edges because those transport libraries already consume Event for concrete Event transports. The preferred future architecture moves those transport-specific bridges downstream into their respective Event integration layers (or dedicated integration packages), leaving Event transport-neutral.
+Transport-specific Event bridges for Sockets and ESP-Now are retained for 5.8.x compatibility, but their reciprocal optional dependency edges are documented for future downstream relocation.
 
-'''
+"""
           text = text[:start] + current + text[end:]
-
-          dep_start = text.index('### Required dependencies')
-          dep_end_marker = '------------------------------------------------------------------------\n\n# What is Event-Driven Observer Pattern?'
-          dep_end = text.index(dep_end_marker, dep_start)
-          deps = '''### Required dependencies
-
-Normal Event applications require:
-
-```ini
-lib_deps =
-    flowduino/ESPressio-Event@^5.8.1
-```
-
-The mandatory dependency graph is:
-
-```text
-ESPressio Event 5.8.1
-    |
-    +-- ESPressio Threads >= 3.1.3 < 4.0.0
-    |
-    +-- ESPressio Observable >= 3.0.1 < 4.0.0
-    |
-    +-- ESPressio Timing >= 2.2.3 < 3.0.0
-```
-
-Timing carries Units 0.2.2 downstream. ESPressio Serializable is **not** a mandatory Event dependency; it is required only when Serializable Events, runtime Serializable Event construction, or Event Transport are selected:
-
-```text
-ESPressio Serializable >= 0.10.1 < 1.0.0
-```
-
-Security, Command, Sockets and ESP-Now remain optional bridge dependencies only. In particular, no new package-level Event -> Sockets or Event -> ESP-Now dependency is introduced by 5.8.1.
-
-### Dependency direction and transport-specific bridges
-
-The intended rule is that dependency edges cascade downstream. Event owns transport-neutral Event semantics and `IEventTransport`; concrete transport libraries may depend on Event to implement transports. Therefore transport-specific observer bridges should ultimately live downstream with those integrations rather than make Event depend back on a concrete transport.
-
-Current compatibility retains the existing 5.8 bridge headers, but the preferred future locations are:
-
-```text
-Sockets Event integration
-    SocketWorkerEventBridge
-    SocketSecuritySessionEventBridge
-
-ESP-Now Event integration
-    ESPNowTransportEventBridge
-```
-
-Generic bridges for genuinely upstream libraries such as Timing, Threads, Command and Security remain appropriate in Event because those libraries do not depend back on Event.
-
-'''
-          text = text[:dep_start] + deps + text[dep_end:]
+          replacements = [
+              ('flowduino/ESPressio-Event@^5.7.1', 'flowduino/ESPressio-Event@^5.8.1'),
+              ('ESPressio Event 5.7.1\n    |\n    +-- ESPressio Threads >= 3.1.2 < 4.0.0', 'ESPressio Event 5.8.1\n    |\n    +-- ESPressio Threads >= 3.1.3 < 4.0.0'),
+              ('+-- ESPressio Timing >= 2.2.2 < 3.0.0', '+-- ESPressio Timing >= 2.2.3 < 3.0.0'),
+              ('The 5.8.0 development branch retains the same mandatory graph. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.', 'Event 5.8.1 retains the same dependency shape. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.'),
+              ('required only when an application explicitly opts into Serializable\nEvents or Event Transport.', 'required only when an application explicitly opts into Serializable\nEvents or Event Transport. The validated current baseline is ESPressio Serializable >= 0.10.1 < 1.0.0.'),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'missing expected README text: {old}')
+              text = text.replace(old, new, 1)
           path.write_text(text)
       - name: Commit README
         run: |
