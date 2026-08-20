@@ -67,22 +67,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Security
-          ref: cb5224b3f98174f8b521ff87d92a373d2e97dcf7
+          ref: 0.2.0
           path: project/dependencies/ESPressio-Security
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Command
-          ref: 74ea89f9c8895cfaa272bae44d0eba5711a3dbc1
+          ref: 0.3.0
           path: project/dependencies/ESPressio-Command
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Sockets
-          ref: 1ecc989968766a40cb4543bee780ac0bcd14a197
+          ref: 0.5.0
           path: project/dependencies/ESPressio-Sockets
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-ESP-Now
-          ref: 9be036ace02c31986c2c7d2d8283fca4b36d338f
+          ref: 0.5.0
           path: project/dependencies/ESPressio-ESP-Now
       - uses: actions/setup-python@v5
         with:
@@ -98,8 +98,12 @@ jobs:
           platform = espressif32
           board = esp32dev
           framework = arduino
-          build_flags = -std=gnu++17
-          build_unflags = -fno-rtti
+          build_flags =
+              -std=gnu++17
+              -frtti
+          build_unflags =
+              -std=gnu++11
+              -fno-rtti
           lib_extra_dirs = ../dependencies
           lib_deps =
               ../ESPressio-Event
