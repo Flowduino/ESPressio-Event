@@ -10,49 +10,43 @@ queues, listener/observer registration, priority dispatch,
 high-resolution Event timing, optional Observer-to-Event bridges, and
 optional transport-neutral Serializable Event routing.
 
-## Latest Stable Version
+## Current Version — 5.8.1
 
-The latest stable version is **5.7.1**.
+ESPressio Event **5.8.1** is a dependency-maintenance patch over 5.8.0. It retains the expanded Observable-to-Event bridge surface while refreshing the validated upstream dependency baselines.
+
+Current dependency model:
+
+```text
+Required
+    ESPressio Threads >= 3.1.3 < 4.0.0
+    ESPressio Timing >= 2.2.3 < 3.0.0
+    ESPressio Observable >= 3.0.1 < 4.0.0
+
+Optional Serializable Event / Event Transport
+    ESPressio Serializable >= 0.10.1 < 1.0.0
+
+Optional observer bridge sources
+    ESPressio Security >= 0.2.0 < 1.0.0
+    ESPressio Command >= 0.3.0 < 1.0.0
+    ESPressio Sockets >= 0.5.0 < 1.0.0
+    ESPressio ESP-Now >= 0.5.0 < 1.0.0
+```
+
+Security and Command remain valid one-way bridge dependencies: those libraries expose synchronous Observable contracts and do not depend back upon Event.
+
+The dependency audit for 5.8.1 identifies two reciprocal optional relationships that should not be strengthened:
+
+```text
+Sockets -> Event       concrete socket Event transports
+Event   -> Sockets     SocketWorkerEventBridge / SocketSecuritySessionEventBridge
+
+ESP-Now -> Event       ESPNowEventTransport
+Event   -> ESP-Now     ESPNowTransportEventBridge
+```
+
+For 5.8.x compatibility the existing bridge headers remain available. The preferred future architecture moves the Sockets-specific and ESP-Now-specific bridges downstream into their respective optional Event integrations, or into dedicated integration packages, leaving ESPressio Event transport-neutral.
 
 For release-by-release history, see [CHANGELOG.md](CHANGELOG.md).
-
-## Current Development Version — 5.8.0
-
-The `feature/observable-callback-coverage` branch targets **5.8.0** and extends Event's existing opt-in Observer-to-Event bridge architecture to the new lifecycle observer contracts introduced across the ESPressio platform.
-
-The new bridge families are:
-
-```text
-ESPressio Security >= 0.2.0 < 1.0.0
-    TransportSecurityEventBridge
-
-ESPressio Command >= 0.3.0 < 1.0.0
-    CommandRegistryEventBridge
-
-ESPressio Sockets >= 0.5.0 < 1.0.0
-    SocketWorkerEventBridge
-    SocketSecuritySessionEventBridge
-
-ESPressio ESP-Now >= 0.5.0 < 1.0.0
-    ESPNowTransportEventBridge
-```
-
-These are **optional integrations**. The mandatory Event dependency graph remains Threads 3.x, Observable 3.x, and Timing 2.x; Security, Command, Sockets, and ESP-Now are required only when their corresponding bridge headers are selected.
-
-The dependency direction remains intentionally one-way:
-
-```text
-Security / Command / Sockets / ESP-Now
-    expose synchronous Observable contracts
-
-Event 5.8
-    optionally consumes those contracts
-    and emits asynchronous Events
-```
-
-The originating libraries therefore do not acquire an ESPressio Event dependency. Socket worker Events are also kept separate from Socket Security Session Events so observing ordinary socket worker lifecycle does not implicitly require ESPressio Security.
-
-The complete stable 5.7.1 documentation below remains intact.
 
 ## Compatibility
 
@@ -201,7 +195,6 @@ See:
 examples/RuntimeSerializableEvents/RuntimeSerializableEvents.ino
 ```
 
-
 ## License
 
 ESPressio and its component libraries are licensed under the **Apache
@@ -242,28 +235,50 @@ library:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.7.1
+    flowduino/ESPressio-Event@^5.8.1
 ```
 
 The mandatory dependency graph is:
 
 ``` text
-ESPressio Event 5.7.1
+ESPressio Event 5.8.1
     |
-    +-- ESPressio Threads >= 3.1.2 < 4.0.0
+    +-- ESPressio Threads >= 3.1.3 < 4.0.0
     |
     +-- ESPressio Observable >= 3.0.1 < 4.0.0
     |
-    +-- ESPressio Timing >= 2.2.2 < 3.0.0
+    +-- ESPressio Timing >= 2.2.3 < 3.0.0
 ```
 
-The 5.8.0 development branch retains the same mandatory graph. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.
-
-ESPressio Units is available through the Timing dependency stack.
+ESPressio Units 0.2.2 is carried by the Timing dependency stack.
 
 **ESPressio Serializable is not a mandatory Event dependency.** It is
 required only when an application explicitly opts into Serializable
-Events or Event Transport.
+Events, runtime Serializable Event construction, or Event Transport. The
+validated current baseline is:
+
+```text
+ESPressio Serializable >= 0.10.1 < 1.0.0
+```
+
+Security, Command, Sockets and ESP-Now remain optional bridge dependencies only. Event 5.8.1 introduces no new mandatory dependency on any of them.
+
+### Dependency direction and transport-specific bridges
+
+The general ESPressio rule is that dependency edges cascade downstream. Event owns transport-neutral Event semantics and `IEventTransport`; concrete transport libraries may consume Event to implement transports. A transport-specific Observer-to-Event bridge should therefore live downstream with that transport integration rather than make Event depend back upon the concrete transport.
+
+The current 5.8.x bridge API is retained for compatibility, but the preferred future locations are:
+
+```text
+Sockets Event integration
+    SocketWorkerEventBridge
+    SocketSecuritySessionEventBridge
+
+ESP-Now Event integration
+    ESPNowTransportEventBridge
+```
+
+Generic bridges for genuinely upstream libraries such as Timing, Threads, Command and Security remain appropriate within Event because those libraries do not depend back on Event.
 
 ------------------------------------------------------------------------
 
@@ -377,7 +392,7 @@ directly: the originating libraries expose synchronous Observer
 notifications, while ESPressio Event can optionally convert those
 notifications into asynchronous Events.
 
-Event 5.8 extends exactly the same model to Security, Command, Sockets, and ESP-Now; it does not move ownership of those lifecycle semantics into Event.
+Event 5.8 extends the same model to Security, Command, Sockets, and ESP-Now. The 5.8.1 dependency audit additionally distinguishes valid one-way bridges from transport-specific bridges that should ultimately move downstream to avoid reciprocal optional dependency edges.
 
 ------------------------------------------------------------------------
 
@@ -1076,8 +1091,8 @@ Serializable explicitly:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.7.1
-    flowduino/ESPressio-Serializable@^0.10.0
+    flowduino/ESPressio-Event@^5.8.1
+    flowduino/ESPressio-Serializable@^0.10.1
 ```
 
 ## `SerializableEvent`
@@ -1169,10 +1184,10 @@ does not require ESPressio Serializable.
 ESPressio Event can optionally convert synchronous Observer
 notifications from other ESPressio libraries into asynchronous Events.
 
-The important dependency direction is:
+For genuinely upstream libraries, the dependency direction is:
 
 ``` text
-Timing / Threads / Security / Command / Sockets / ESP-Now
+Timing / Threads / Security / Command
     expose synchronous Observer APIs
 
 Event
@@ -1181,6 +1196,8 @@ Event
 ```
 
 The originating libraries therefore do not need to depend upward on Event.
+
+Sockets and ESP-Now are special cases in 5.8.x because each already optionally consumes Event to implement concrete Event transports. Their existing bridges remain available for compatibility, but should move downstream in a future integration relocation.
 
 ## System Clock Event Bridge
 
@@ -1265,7 +1282,7 @@ Bridge batch headers are:
 
 The ordinary bridges do not require ESPressio Serializable.
 
-## Security Event Bridge (5.8.0 development)
+## Security Event Bridge
 
 `TransportSecurityEventBridge` observes one selected `Security::TransportSecurity` instance and emits asynchronous Events for configuration changes, session establishment/reset, replay-protection resets, and security failures.
 
@@ -1278,13 +1295,13 @@ bridge.Initialize(security);
 
 The bridge is instance-oriented because `TransportSecurity` is application-owned state rather than a process singleton.
 
-## Command Registry Event Bridge (5.8.0 development)
+## Command Registry Event Bridge
 
 `CommandRegistryEventBridge` converts command registration/unregistration lifecycle notifications from the process-wide `CommandRegistry` into Events. It deliberately does not convert normal Command execution callbacks or middleware into a competing Event execution mechanism.
 
-## Socket Event Bridges (5.8.0 development)
+## Socket Event Bridges
 
-Socket lifecycle is split according to dependency ownership:
+For 5.8.x compatibility, socket lifecycle bridges remain split according to dependency ownership:
 
 ``` text
 SocketWorkerEventBridge
@@ -1296,13 +1313,15 @@ SocketSecuritySessionEventBridge
     -> requires Sockets + Security
 ```
 
-This separation prevents ordinary Socket worker observation from acquiring an unnecessary Security dependency.
+Because Sockets also implements concrete Event transports, these bridge implementations should ultimately move downstream into Sockets' optional Event integration to eliminate the reciprocal optional dependency edge.
 
-## ESP-Now Transport Event Bridge (5.8.0 development)
+## ESP-Now Transport Event Bridge
 
 `ESPNowTransportEventBridge` converts the ESP-NOW transport's initialization, shutdown, peer lifecycle, and send-result observer notifications into asynchronous Events while leaving protocol receive delivery with the existing ESP-NOW handler mechanism.
 
-All new 5.8 bridges remain dormant until explicitly initialized.
+Because ESP-Now also implements `ESPNowEventTransport`, this bridge should ultimately move downstream into ESP-Now's optional Event integration to eliminate the reciprocal optional dependency edge.
+
+All 5.8 bridge families remain dormant until explicitly initialized.
 
 ------------------------------------------------------------------------
 
@@ -1459,9 +1478,7 @@ payload length
 ```
 
 The payload uses the ESPressio Serializable **ESPB v2 binary wire format**.
-Event 5.7 uses Serializable's direct binary path for the normal same-schema
-transport case, while retaining the existing `BinaryArchive` path as a
-compatibility and schema-migration fallback.
+Event 5.8.1 validates against Serializable 0.10.1 while preserving the existing wire representation and direct binary transport path, with the archive path retained for compatibility/schema-migration cases.
 
 ## EventTransportManager observation
 
@@ -1470,7 +1487,6 @@ surface for transport registration, type/route lifecycle, and
 inbound/outbound diagnostics.
 
 ------------------------------------------------------------------------
-
 
 ## Event Transport Transaction Observation
 
