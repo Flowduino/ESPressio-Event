@@ -1,5 +1,6 @@
 #include <cassert>
 #include <atomic>
+#include <cstdint>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -11,6 +12,7 @@ using namespace ESPressio::Event;
 class ReferenceTrackingEvent final : public IEvent {
     private:
         int _references = 0;
+        EventDispatchContext _dispatchContext{};
 
     public:
         void __ref() noexcept override { ++_references; }
@@ -19,10 +21,16 @@ class ReferenceTrackingEvent final : public IEvent {
             --_references;
         }
         void __dispatch() override { }
+        void __setDispatchContext(const EventDispatchContext& context) override {
+            _dispatchContext = context;
+        }
+        EventDispatchContext __getDispatchContext() const override {
+            return _dispatchContext;
+        }
         void Queue(EventPriority = EventPriority::Normal) override { }
         void Stack(EventPriority = EventPriority::Normal) override { }
-        EventTime GetDispatchTime() override { return EventTime(0); }
-        EventTime GetTimeSinceDispatch() override { return EventTime(0); }
+        uint64_t GetDispatchTimeNanoseconds() const override { return 0; }
+        uint64_t GetTimeSinceDispatchNanoseconds() const override { return 0; }
         int References() const { return _references; }
 };
 
@@ -65,6 +73,7 @@ class HeapTrackingEvent final : public IEvent {
     private:
         int _references = 0;
         int& _liveEvents;
+        EventDispatchContext _dispatchContext{};
 
     public:
         explicit HeapTrackingEvent(int& liveEvents)
@@ -82,10 +91,16 @@ class HeapTrackingEvent final : public IEvent {
             }
         }
         void __dispatch() override { }
+        void __setDispatchContext(const EventDispatchContext& context) override {
+            _dispatchContext = context;
+        }
+        EventDispatchContext __getDispatchContext() const override {
+            return _dispatchContext;
+        }
         void Queue(EventPriority = EventPriority::Normal) override { }
         void Stack(EventPriority = EventPriority::Normal) override { }
-        EventTime GetDispatchTime() override { return EventTime(0); }
-        EventTime GetTimeSinceDispatch() override { return EventTime(0); }
+        uint64_t GetDispatchTimeNanoseconds() const override { return 0; }
+        uint64_t GetTimeSinceDispatchNanoseconds() const override { return 0; }
 };
 
 int main() {

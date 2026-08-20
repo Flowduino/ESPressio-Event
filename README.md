@@ -16,6 +16,44 @@ The latest stable version is **5.7.1**.
 
 For release-by-release history, see [CHANGELOG.md](CHANGELOG.md).
 
+## Current Development Version — 5.8.0
+
+The `feature/observable-callback-coverage` branch targets **5.8.0** and extends Event's existing opt-in Observer-to-Event bridge architecture to the new lifecycle observer contracts introduced across the ESPressio platform.
+
+The new bridge families are:
+
+```text
+ESPressio Security >= 0.2.0 < 1.0.0
+    TransportSecurityEventBridge
+
+ESPressio Command >= 0.3.0 < 1.0.0
+    CommandRegistryEventBridge
+
+ESPressio Sockets >= 0.5.0 < 1.0.0
+    SocketWorkerEventBridge
+    SocketSecuritySessionEventBridge
+
+ESPressio ESP-Now >= 0.5.0 < 1.0.0
+    ESPNowTransportEventBridge
+```
+
+These are **optional integrations**. The mandatory Event dependency graph remains Threads 3.x, Observable 3.x, and Timing 2.x; Security, Command, Sockets, and ESP-Now are required only when their corresponding bridge headers are selected.
+
+The dependency direction remains intentionally one-way:
+
+```text
+Security / Command / Sockets / ESP-Now
+    expose synchronous Observable contracts
+
+Event 5.8
+    optionally consumes those contracts
+    and emits asynchronous Events
+```
+
+The originating libraries therefore do not acquire an ESPressio Event dependency. Socket worker Events are also kept separate from Socket Security Session Events so observing ordinary socket worker lifecycle does not implicitly require ESPressio Security.
+
+The complete stable 5.7.1 documentation below remains intact.
+
 ## Compatibility
 
 ESPressio Event targets the **ESP32 family** using Arduino-ESP32.
@@ -219,6 +257,8 @@ ESPressio Event 5.7.1
     +-- ESPressio Timing >= 2.2.2 < 3.0.0
 ```
 
+The 5.8.0 development branch retains the same mandatory graph. Security, Command, Sockets, and ESP-Now remain optional bridge dependencies only.
+
 ESPressio Units is available through the Timing dependency stack.
 
 **ESPressio Serializable is not a mandatory Event dependency.** It is
@@ -336,6 +376,8 @@ The opt-in Timing and Threads Event Bridges demonstrate this distinction
 directly: the originating libraries expose synchronous Observer
 notifications, while ESPressio Event can optionally convert those
 notifications into asynchronous Events.
+
+Event 5.8 extends exactly the same model to Security, Command, Sockets, and ESP-Now; it does not move ownership of those lifecycle semantics into Event.
 
 ------------------------------------------------------------------------
 
@@ -1130,7 +1172,7 @@ notifications from other ESPressio libraries into asynchronous Events.
 The important dependency direction is:
 
 ``` text
-Timing / Threads
+Timing / Threads / Security / Command / Sockets / ESP-Now
     expose synchronous Observer APIs
 
 Event
@@ -1138,7 +1180,7 @@ Event
     and emits asynchronous Events
 ```
 
-Timing and Threads therefore do not need to depend upward on Event.
+The originating libraries therefore do not need to depend upward on Event.
 
 ## System Clock Event Bridge
 
@@ -1222,6 +1264,45 @@ Bridge batch headers are:
 ```
 
 The ordinary bridges do not require ESPressio Serializable.
+
+## Security Event Bridge (5.8.0 development)
+
+`TransportSecurityEventBridge` observes one selected `Security::TransportSecurity` instance and emits asynchronous Events for configuration changes, session establishment/reset, replay-protection resets, and security failures.
+
+``` cpp
+#include <ESPressio_TransportSecurityEventBridge.hpp>
+
+ESPressio::Event::TransportSecurityEventBridge bridge;
+bridge.Initialize(security);
+```
+
+The bridge is instance-oriented because `TransportSecurity` is application-owned state rather than a process singleton.
+
+## Command Registry Event Bridge (5.8.0 development)
+
+`CommandRegistryEventBridge` converts command registration/unregistration lifecycle notifications from the process-wide `CommandRegistry` into Events. It deliberately does not convert normal Command execution callbacks or middleware into a competing Event execution mechanism.
+
+## Socket Event Bridges (5.8.0 development)
+
+Socket lifecycle is split according to dependency ownership:
+
+``` text
+SocketWorkerEventBridge
+    -> worker start / start failure / stop
+    -> requires Sockets only
+
+SocketSecuritySessionEventBridge
+    -> secure-session fault / reset
+    -> requires Sockets + Security
+```
+
+This separation prevents ordinary Socket worker observation from acquiring an unnecessary Security dependency.
+
+## ESP-Now Transport Event Bridge (5.8.0 development)
+
+`ESPNowTransportEventBridge` converts the ESP-NOW transport's initialization, shutdown, peer lifecycle, and send-result observer notifications into asynchronous Events while leaving protocol receive delivery with the existing ESP-NOW handler mechanism.
+
+All new 5.8 bridges remain dormant until explicitly initialized.
 
 ------------------------------------------------------------------------
 
@@ -1437,7 +1518,7 @@ EventTransportTransactionStage::Failed
 
 The transaction callback is intended for diagnostics, tracing, monitoring, telemetry, persistence, and similar cross-cutting integrations without coupling ESPressio Event to any particular output mechanism.
 
-For example, a future ESPressio Serial Event Monitor can subscribe once to `EventTransportManager` and observe every Serializable Event Transport transaction without implementing or wrapping a physical Event transport.
+For example, ESPressio Serial Event Monitor can subscribe once to `EventTransportManager` and observe every Serializable Event Transport transaction without implementing or wrapping a physical Event transport.
 
 ### Borrowed lifetime
 
@@ -1578,8 +1659,10 @@ The wider integration architecture is:
         v              v              v
  local routing    Event Bridges   Event Transport
         |              |              |
-        |         Timing/Threads      |
-        |          Observers           |
+        |    Timing / Threads /        |
+        |    Security / Command /      |
+        |    Sockets / ESP-Now         |
+        |       Observers              |
         |                             |
         +-----------------------------+
                        |

@@ -19,12 +19,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: main
+          ref: 2.2.2
           path: ESPressio_Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Units
-          ref: main
+          ref: 0.2.1
           path: ESPressio-Units
       - name: Configure
         run: cmake -S ESPressio-Event/tests -B build
@@ -46,30 +46,45 @@ jobs:
           path: project/dependencies/ESPressio-Observable
       - uses: actions/checkout@v4
         with:
-          repository: Flowduino/ESPressio-Serializable
-          ref: 0.10.0
-          path: project/dependencies/ESPressio-Serializable
-      - uses: actions/checkout@v4
-        with:
           repository: Flowduino/ESPressio-Units
-          ref: main
+          ref: 0.2.1
           path: project/dependencies/ESPressio-Units
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Timing
-          ref: main
+          ref: 2.2.2
           path: project/dependencies/ESPressio-Timing
       - uses: actions/checkout@v4
         with:
           repository: Flowduino/ESPressio-Threads
-          ref: main
+          ref: 3.1.2
           path: project/dependencies/ESPressio-Threads
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-Security
+          ref: 0.2.0
+          path: project/dependencies/ESPressio-Security
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-Command
+          ref: 0.3.0
+          path: project/dependencies/ESPressio-Command
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-Sockets
+          ref: 0.5.0
+          path: project/dependencies/ESPressio-Sockets
+      - uses: actions/checkout@v4
+        with:
+          repository: Flowduino/ESPressio-ESP-Now
+          ref: 0.5.0
+          path: project/dependencies/ESPressio-ESP-Now
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       - name: Install PlatformIO
         run: pip install platformio
-      - name: Create compile project
+      - name: Create bridge compile project
         shell: bash
         run: |
           mkdir -p project/compile/src
@@ -78,76 +93,35 @@ jobs:
           platform = espressif32
           board = esp32dev
           framework = arduino
-          build_flags = -std=gnu++17
-          build_unflags = -fno-rtti
-          lib_extra_dirs = ../dependencies
+          build_flags =
+              -std=gnu++17
+              -frtti
+              -I../dependencies/ESPressio-Security/src
+              -I../dependencies/ESPressio-Command/src
+              -I../dependencies/ESPressio-Sockets/src
+              -I../dependencies/ESPressio-ESP-Now/src
+          build_unflags =
+              -std=gnu++11
+              -fno-rtti
+          lib_ldf_mode = deep+
           lib_deps =
+              ../dependencies/ESPressio-Observable
+              ../dependencies/ESPressio-Units
+              ../dependencies/ESPressio-Timing
+              ../dependencies/ESPressio-Threads
               ../ESPressio-Event
           EOF
           cat > project/compile/src/main.cpp <<'EOF'
           #include <Arduino.h>
-          #include <ESPressio_EventThread.hpp>
-          #include <ESPressio_Event_Serializable.hpp>
-          #include <ESPressio_EventTransport.hpp>
+          #include <WiFi.h>
+          #include <ESPressio_TransportSecurityEventBridge.hpp>
+          #include <ESPressio_CommandRegistryEventBridge.hpp>
+          #include <ESPressio_SocketWorkerEventBridge.hpp>
+          #include <ESPressio_SocketSecuritySessionEventBridge.hpp>
+          #include <ESPressio_ESPNowTransportEventBridge.hpp>
 
-          class CompileEvent final :
-              public ESPressio::Event::SerializableEvent<CompileEvent> {
-          public:
-              uint32_t Value = 7;
-              ESPRESSIO_SERIALIZABLE_TYPE(CompileEvent)
-              ESPRESSIO_SERIALIZABLE_SCHEMA_VERSION(1)
-              ESPRESSIO_SERIALIZABLE_PROPERTIES(
-                  ESPRESSIO_PROPERTY("value", Value)
-              )
-          };
-
-          ESPRESSIO_EVENT_TRANSPORT_TYPE(
-              CompileEvent,
-              "flowduino.ci.compile.v1"
-          )
-
-          class CompileTransport final :
-              public ESPressio::Event::IEventTransport {
-              ESPressio::Event::IEventTransportReceiver* receiver = nullptr;
-          public:
-              bool Send(const ESPressio::Event::EventTransportPacket&) override {
-                  return true;
-              }
-              void SetReceiver(
-                  ESPressio::Event::IEventTransportReceiver* value
-              ) override {
-                  receiver = value;
-              }
-          };
-
-          class CompileListener final : public ESPressio::Event::EventThread {
-              ESPressio::Event::EventListenerHandlePtr handle;
-          public:
-              CompileListener() : ESPressio::Event::EventThread(false) {}
-              void Register() {
-                  handle = RegisterListener<CompileEvent>(
-                      [](CompileEvent*,
-                         ESPressio::Event::EventDispatchMethod,
-                         ESPressio::Event::EventPriority) {}
-                  );
-              }
-          };
-
-          CompileTransport transport;
-          CompileListener listener;
-
-          void setup() {
-              auto& manager =
-                  ESPressio::Event::EventTransportManager::GetInstance();
-              manager.RegisterTransport(&transport);
-              manager.RegisterBidirectionalEvent<CompileEvent>(&transport);
-              manager.Initialize();
-              listener.Register();
-              auto* event = new CompileEvent();
-              event->Queue();
-          }
-
+          void setup() {}
           void loop() {}
           EOF
-      - name: Compile ESP32 target
+      - name: Compile ESP32 optional bridges
         run: pio run -d project/compile

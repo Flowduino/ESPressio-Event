@@ -1,5 +1,22 @@
 # Changelog
 
+## 5.8.0 — 2026-08-20
+
+### Added
+- Added opt-in `TransportSecurityEventBridge` and Security lifecycle Event types for ESPressio Security 0.2.x configuration, session, replay-protection and failure observations.
+- Added opt-in `CommandRegistryEventBridge` and Command registry Event types for ESPressio Command 0.3.x registration lifecycle observations.
+- Added opt-in `SocketWorkerEventBridge` and `SocketSecuritySessionEventBridge` with corresponding Sockets lifecycle Event types for ESPressio Sockets 0.5.x.
+- Added opt-in `ESPNowTransportEventBridge` and ESP-NOW lifecycle Event types for ESPressio ESP-Now 0.5.x initialization, peer and send observations.
+
+### Changed
+- Preserved the existing dependency direction: Security, Command, Sockets and ESP-Now remain independent of ESPressio Event; their Event bridges are selected explicitly from ESPressio Event.
+- Kept Event's mandatory dependency set unchanged at Threads 3.1.2+, Observable 3.0.1+ and Timing 2.2.2+ within their current major lines.
+- Updated package and ESP-IDF component version metadata for Event 5.8.0.
+
+### Compatibility
+- Existing Event, EventThread, Event Transport, Timing bridges and Thread bridges remain source-compatible.
+- No new mandatory Security, Command, Sockets or ESP-Now dependency is introduced.
+
 ## 5.7.1 — 2026-08-20
 
 ### Changed
