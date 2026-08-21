@@ -10,9 +10,9 @@ queues, listener/observer registration, priority dispatch,
 high-resolution Event timing, optional Observer-to-Event bridges, and
 optional transport-neutral Serializable Event routing.
 
-## Current Version — 5.8.2
+## Current Version — 5.8.4
 
-ESPressio Event **5.8.2** is a dependency-maintenance patch over 5.8.1. It retains the expanded Observable-to-Event bridge surface while refreshing the validated upstream dependency baselines.
+ESPressio Event **5.8.4** is a dependency-maintenance patch over 5.8.3. It preserves the allocation-free Event lifecycle synchronization fix introduced in 5.8.3 while refreshing the validated ESP-Now bridge baseline to released ESPressio ESP-Now 0.5.3.
 
 Current dependency model:
 
@@ -29,12 +29,12 @@ Optional observer bridge sources
     ESPressio Security >= 0.2.0 < 1.0.0
     ESPressio Command >= 0.3.0 < 1.0.0
     ESPressio Sockets >= 0.5.0 < 1.0.0
-    ESPressio ESP-Now >= 0.5.0 < 1.0.0
+    ESPressio ESP-Now >= 0.5.3 < 1.0.0
 ```
 
 Security and Command remain valid one-way bridge dependencies: those libraries expose synchronous Observable contracts and do not depend back upon Event.
 
-The dependency audit for 5.8.2 identifies two reciprocal optional relationships that should not be strengthened:
+The dependency audit for 5.8.4 identifies two reciprocal optional relationships that should not be strengthened:
 
 ```text
 Sockets -> Event       concrete socket Event transports
@@ -53,7 +53,8 @@ For release-by-release history, see [CHANGELOG.md](CHANGELOG.md).
 ESPressio Event targets the **ESP32 family** using Arduino-ESP32.
 
 The implementation uses ESP-IDF FreeRTOS facilities, C++ RTTI,
-`std::shared_mutex`, and Arduino APIs through its dependency stack.
+allocation-free `std::atomic_flag` guards for per-Event lifecycle metadata,
+and Arduino APIs through its dependency stack.
 
 RTTI must be enabled:
 
@@ -235,13 +236,13 @@ library:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.8.2
+    flowduino/ESPressio-Event@^5.8.4
 ```
 
 The mandatory dependency graph is:
 
 ``` text
-ESPressio Event 5.8.2
+ESPressio Event 5.8.4
     |
     +-- ESPressio Threads >= 3.1.4 < 4.0.0
     |
@@ -261,7 +262,7 @@ validated current baseline is:
 ESPressio Serializable >= 0.10.2 < 1.0.0
 ```
 
-Security, Command, Sockets and ESP-Now remain optional bridge dependencies only. Event 5.8.2 introduces no new mandatory dependency on any of them.
+Security, Command, Sockets and ESP-Now remain optional bridge dependencies only. Event 5.8.4 introduces no new mandatory dependency on any of them. The ESP-Now bridge is validated against ESPressio ESP-Now 0.5.3.
 
 ### Dependency direction and transport-specific bridges
 
@@ -392,7 +393,7 @@ directly: the originating libraries expose synchronous Observer
 notifications, while ESPressio Event can optionally convert those
 notifications into asynchronous Events.
 
-Event 5.8 extends the same model to Security, Command, Sockets, and ESP-Now. The 5.8.2 dependency audit additionally distinguishes valid one-way bridges from transport-specific bridges that should ultimately move downstream to avoid reciprocal optional dependency edges.
+Event 5.8 extends the same model to Security, Command, Sockets, and ESP-Now. The 5.8.4 dependency audit additionally distinguishes valid one-way bridges from transport-specific bridges that should ultimately move downstream to avoid reciprocal optional dependency edges.
 
 ------------------------------------------------------------------------
 
@@ -1091,7 +1092,7 @@ Serializable explicitly:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.8.2
+    flowduino/ESPressio-Event@^5.8.4
     flowduino/ESPressio-Serializable@^0.10.2
 ```
 
@@ -1319,7 +1320,7 @@ Because Sockets also implements concrete Event transports, these bridge implemen
 
 `ESPNowTransportEventBridge` converts the ESP-NOW transport's initialization, shutdown, peer lifecycle, and send-result observer notifications into asynchronous Events while leaving protocol receive delivery with the existing ESP-NOW handler mechanism.
 
-Because ESP-Now also implements `ESPNowEventTransport`, this bridge should ultimately move downstream into ESP-Now's optional Event integration to eliminate the reciprocal optional dependency edge.
+Event 5.8.4 validates this bridge against ESPressio ESP-Now 0.5.3. Because ESP-Now also implements `ESPNowEventTransport`, this bridge should ultimately move downstream into ESP-Now's optional Event integration to eliminate the reciprocal optional dependency edge.
 
 All 5.8 bridge families remain dormant until explicitly initialized.
 
@@ -1478,7 +1479,7 @@ payload length
 ```
 
 The payload uses the ESPressio Serializable **ESPB v2 binary wire format**.
-Event 5.8.2 validates against Serializable 0.10.2 while preserving the existing wire representation and direct binary transport path, with the archive path retained for compatibility/schema-migration cases.
+Event 5.8.4 validates against Serializable 0.10.2 while preserving the existing wire representation and direct binary transport path, with the archive path retained for compatibility/schema-migration cases.
 
 ## EventTransportManager observation
 
