@@ -1,11 +1,11 @@
-# ESPressio Dependency Chart — Event 5.8.3
+# ESPressio Dependency Chart — Event 5.8.4
 
 ![ESPressio Library Dependency Chart](ESPRESSIO_DEPENDENCY_CHART.png)
 
 ## Required dependencies
 
 ```text
-ESPressio Event 5.8.3
+ESPressio Event 5.8.4
     -> ESPressio Threads >= 3.1.4 < 4.0.0
     -> ESPressio Timing >= 2.2.4 < 3.0.0
     -> ESPressio Observable >= 3.0.1 < 4.0.0
@@ -14,7 +14,7 @@ ESPressio Event 5.8.3
 The transitive required chain is:
 
 ```text
-Event 5.8.3
+Event 5.8.4
     -> Threads 3.1.4
         -> Timing 2.2.4
             -> Units 0.2.3
@@ -34,8 +34,9 @@ runtime Serializable Event construction, and Event Transport require:
 ESPressio Serializable >= 0.10.2 < 1.0.0
 ```
 
-Event 5.8.3 changes only Event lifecycle synchronization internals. The Event
-Transport envelope and ESPB v2 payload representation remain unchanged.
+Event 5.8.4 preserves the allocation-free Event lifecycle synchronization fix
+released in 5.8.3. The Event Transport envelope and ESPB v2 payload
+representation remain unchanged.
 
 ## Optional Observer-to-Event bridges
 
@@ -45,10 +46,12 @@ Event 5.8.x provides opt-in bridges for Observable contracts from:
 Security >= 0.2.0 < 1.0.0
 Command >= 0.3.0 < 1.0.0
 Sockets >= 0.5.0 < 1.0.0
-ESP-Now >= 0.5.0 < 1.0.0
+ESP-Now >= 0.5.3 < 1.0.0
 ```
 
-These integrations remain optional.
+The ESP-Now bridge baseline is validated against released ESPressio ESP-Now
+0.5.3, including its peer-liveness reliability improvements. These integrations
+remain optional.
 
 ## Current coordinated ecosystem
 
@@ -68,13 +71,14 @@ EXECUTION
 
 TRANSPORT / INTEGRATION
 ├── Sockets 0.5.0
-└── ESP-Now 0.5.2
+└── ESP-Now 0.5.3
 
 EVENT
-└── Event 5.8.3
+└── Event 5.8.4
 
 DIAGNOSTICS / OPERATOR
 └── Serial 0.5.1
+    (0.5.2 cascade pending Event 5.8.4 release)
 ```
 
 ## Circular-dependency audit
@@ -129,7 +133,7 @@ Sockets Event integration
 Dedicated integration packages would also be valid if keeping the core
 libraries completely unaware of one another is preferable.
 
-Until those relocations occur, Event 5.8.3 does not add or strengthen any new
+Until those relocations occur, Event 5.8.4 does not add or strengthen any new
 Event -> ESP-Now or Event -> Sockets package-level dependency. Existing bridge
 headers remain available for compatibility only.
 
