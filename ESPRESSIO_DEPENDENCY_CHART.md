@@ -1,11 +1,11 @@
-# ESPressio Dependency Chart — Event 5.8.2
+# ESPressio Dependency Chart — Event 5.8.3
 
 ![ESPressio Library Dependency Chart](ESPRESSIO_DEPENDENCY_CHART.png)
 
 ## Required dependencies
 
 ```text
-ESPressio Event 5.8.2
+ESPressio Event 5.8.3
     -> ESPressio Threads >= 3.1.4 < 4.0.0
     -> ESPressio Timing >= 2.2.4 < 3.0.0
     -> ESPressio Observable >= 3.0.1 < 4.0.0
@@ -14,7 +14,7 @@ ESPressio Event 5.8.2
 The transitive required chain is:
 
 ```text
-Event 5.8.2
+Event 5.8.3
     -> Threads 3.1.4
         -> Timing 2.2.4
             -> Units 0.2.3
@@ -34,10 +34,8 @@ runtime Serializable Event construction, and Event Transport require:
 ESPressio Serializable >= 0.10.2 < 1.0.0
 ```
 
-Serializable 0.10.2 preserves the ESPB v2 wire representation while retaining
-bounded/allocation-free inspection facilities and correcting the strict-build
-warning exposed by downstream consumers. Event's transport wire format is
-unchanged by this dependency refresh.
+Event 5.8.3 changes only Event lifecycle synchronization internals. The Event
+Transport envelope and ESPB v2 payload representation remain unchanged.
 
 ## Optional Observer-to-Event bridges
 
@@ -50,8 +48,7 @@ Sockets >= 0.5.0 < 1.0.0
 ESP-Now >= 0.5.0 < 1.0.0
 ```
 
-These integrations must remain optional. Security, Command, Sockets and ESP-Now
-do not become mandatory Event dependencies merely because bridge headers exist.
+These integrations remain optional.
 
 ## Current coordinated ecosystem
 
@@ -74,7 +71,7 @@ TRANSPORT / INTEGRATION
 └── ESP-Now 0.5.2
 
 EVENT
-└── Event 5.8.2
+└── Event 5.8.3
 
 DIAGNOSTICS / OPERATOR
 └── Serial 0.5.1
@@ -132,7 +129,7 @@ Sockets Event integration
 Dedicated integration packages would also be valid if keeping the core
 libraries completely unaware of one another is preferable.
 
-Until those relocations occur, Event 5.8.2 does not add or strengthen any new
+Until those relocations occur, Event 5.8.3 does not add or strengthen any new
 Event -> ESP-Now or Event -> Sockets package-level dependency. Existing bridge
 headers remain available for compatibility only.
 
