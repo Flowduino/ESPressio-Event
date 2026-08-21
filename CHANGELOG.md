@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.8.3 — 2026-08-21
+
+### Fixed
+- Removed the two per-instance `Threads::ReadWriteMutex` / `std::shared_mutex` objects from `Event<T>` lifecycle metadata to prevent repeated pthread/FreeRTOS rwlock allocation under sustained Event churn on ESP32.
+- Replaced those allocation-backed locks with per-Event allocation-free synchronization while preserving first-dispatch timestamp semantics and coherent `EventDispatchContext` access.
+- Fixed the hardware-observed abort path that reached `pthread_rwlock_init()` / ESP-IDF `lock_init_generic()` from `EventManager::OnEventDispatched()` during long-running EventConsole-Lab workloads.
+
+### Changed
+- Updated package metadata, README, and dependency documentation for Event 5.8.3.
+- Kept the required dependency baselines unchanged at Threads `>=3.1.4 <4.0.0`, Timing `>=2.2.4 <3.0.0`, and Observable `>=3.0.1 <4.0.0`.
+- Kept Serializable `>=0.10.2 <1.0.0` as the validated optional baseline for Serializable Events and Event Transport.
+
+### Compatibility
+- No Event, EventThread, listener, Observer, Serializable Event, Event Transport routing, or wire-format API changes are introduced by this patch.
+- The Event Transport envelope and ESPB v2 payload representation are unchanged.
+
 ## 5.8.2 — 2026-08-21
 
 ### Changed

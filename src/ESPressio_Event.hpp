@@ -5,7 +5,6 @@
 
 #include <ESPressio_SystemClock.hpp>
 #include <ESPressio_TimeTraits.hpp>
-#include <ESPressio_ThreadSafe.hpp>
 
 #include "ESPressio_IEvent.hpp"
 #include "ESPressio_EventEnums.hpp"
@@ -45,17 +44,67 @@ namespace ESPressio {
                 };
 
 
-                mutable Threads::ReadWriteMutex<
-                    DispatchState
-                > _dispatchState{
-                    DispatchState()
+                class AtomicFlagGuard {
+                    private:
+                        std::atomic_flag& _flag;
+
+                    public:
+                        explicit AtomicFlagGuard(
+                            std::atomic_flag& flag
+                        ) noexcept :
+                            _flag(flag) {
+                            while (
+                                _flag.test_and_set(
+                                    std::memory_order_acquire
+                                )
+                            ) {
+                                /* Tiny lifecycle/context critical section. */
+                            }
+                        }
+
+                        ~AtomicFlagGuard() {
+                            _flag.clear(
+                                std::memory_order_release
+                            );
+                        }
+
+                        AtomicFlagGuard(
+                            const AtomicFlagGuard&
+                        ) = delete;
+
+                        AtomicFlagGuard& operator=(
+                            const AtomicFlagGuard&
+                        ) = delete;
                 };
+
+
+                /*
+                 * Event instances are intentionally short-lived. The previous
+                 * ReadWriteMutex members ultimately owned lazily-created
+                 * pthread/FreeRTOS rwlock resources on ESP32. Sustained Event
+                 * churn could therefore exhaust lock/heap resources.
+                 *
+                 * atomic_flag is guaranteed lock-free and owns no external
+                 * lock resource. Keep the original DispatchState and
+                 * EventDispatchContext representations intact so Event
+                 * Transport observes the same context semantics as 5.8.2.
+                 */
+                mutable std::atomic_flag
+                    _dispatchStateGuard =
+                        ATOMIC_FLAG_INIT;
+
+                DispatchState
+                    _dispatchState{};
 
                 std::atomic<uint32_t>
                     _refCount{0};
 
-                mutable Threads::ReadWriteMutex<EventDispatchContext>
-                    _dispatchContext{EventDispatchContext()};
+                mutable std::atomic_flag
+                    _dispatchContextGuard =
+                        ATOMIC_FLAG_INIT;
+
+                EventDispatchContext
+                    _dispatchContext{};
 
 
                 static uint64_t
@@ -122,6 +171,16 @@ namespace ESPressio {
                 }
 
 
+                DispatchState
+                GetDispatchState() const noexcept {
+                    AtomicFlagGuard lock(
+                        _dispatchStateGuard
+                    );
+
+                    return _dispatchState;
+                }
+
+
             public:
                 using TimeType = TTime;
 
@@ -171,23 +230,21 @@ namespace ESPressio {
                 void __setDispatchContext(
                     const EventDispatchContext& context
                 ) override {
-                    _dispatchContext.WithWriteLock(
-                        [&](EventDispatchContext& current) {
-                            current = context;
-                        }
+                    AtomicFlagGuard lock(
+                        _dispatchContextGuard
                     );
+
+                    _dispatchContext = context;
                 }
 
 
                 EventDispatchContext
                 __getDispatchContext() const override {
-                    EventDispatchContext result;
-                    _dispatchContext.WithSharedReadLock(
-                        [&](const EventDispatchContext& current) {
-                            result = current;
-                        }
+                    AtomicFlagGuard lock(
+                        _dispatchContextGuard
                     );
-                    return result;
+
+                    return _dispatchContext;
                 }
 
 
@@ -195,26 +252,22 @@ namespace ESPressio {
                     const uint64_t now =
                         GetNowNanoseconds();
 
-                    _dispatchState.
-                        WithWriteLock(
-                            [now](
-                                DispatchState&
-                                    state
-                            ) {
-                                if (
-                                    !state.
-                                        WasDispatched
-                                ) {
-                                    state.
-                                        WasDispatched =
-                                            true;
+                    AtomicFlagGuard lock(
+                        _dispatchStateGuard
+                    );
 
-                                    state.
-                                        DispatchTimeNanoseconds =
-                                            now;
-                                }
-                            }
-                        );
+                    if (
+                        !_dispatchState.
+                            WasDispatched
+                    ) {
+                        _dispatchState.
+                            WasDispatched =
+                                true;
+
+                        _dispatchState.
+                            DispatchTimeNanoseconds =
+                                now;
+                    }
                 }
 
 
@@ -249,7 +302,7 @@ namespace ESPressio {
                     const override {
 
                     const DispatchState state =
-                        _dispatchState.Get();
+                        GetDispatchState();
 
                     return
                         state.WasDispatched
@@ -264,7 +317,7 @@ namespace ESPressio {
                     const override {
 
                     const DispatchState state =
-                        _dispatchState.Get();
+                        GetDispatchState();
 
                     if (!state.WasDispatched) {
                         return 0;
