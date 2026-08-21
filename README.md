@@ -10,20 +10,20 @@ queues, listener/observer registration, priority dispatch,
 high-resolution Event timing, optional Observer-to-Event bridges, and
 optional transport-neutral Serializable Event routing.
 
-## Current Version — 5.8.1
+## Current Version — 5.8.2
 
-ESPressio Event **5.8.1** is a dependency-maintenance patch over 5.8.0. It retains the expanded Observable-to-Event bridge surface while refreshing the validated upstream dependency baselines.
+ESPressio Event **5.8.2** is a dependency-maintenance patch over 5.8.0. It retains the expanded Observable-to-Event bridge surface while refreshing the validated upstream dependency baselines.
 
 Current dependency model:
 
 ```text
 Required
-    ESPressio Threads >= 3.1.3 < 4.0.0
-    ESPressio Timing >= 2.2.3 < 3.0.0
+    ESPressio Threads >= 3.1.4 < 4.0.0
+    ESPressio Timing >= 2.2.4 < 3.0.0
     ESPressio Observable >= 3.0.1 < 4.0.0
 
 Optional Serializable Event / Event Transport
-    ESPressio Serializable >= 0.10.1 < 1.0.0
+    ESPressio Serializable >= 0.10.2 < 1.0.0
 
 Optional observer bridge sources
     ESPressio Security >= 0.2.0 < 1.0.0
@@ -34,7 +34,7 @@ Optional observer bridge sources
 
 Security and Command remain valid one-way bridge dependencies: those libraries expose synchronous Observable contracts and do not depend back upon Event.
 
-The dependency audit for 5.8.1 identifies two reciprocal optional relationships that should not be strengthened:
+The dependency audit for 5.8.2 identifies two reciprocal optional relationships that should not be strengthened:
 
 ```text
 Sockets -> Event       concrete socket Event transports
@@ -235,22 +235,22 @@ library:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.8.1
+    flowduino/ESPressio-Event@^5.8.2
 ```
 
 The mandatory dependency graph is:
 
 ``` text
-ESPressio Event 5.8.1
+ESPressio Event 5.8.2
     |
-    +-- ESPressio Threads >= 3.1.3 < 4.0.0
+    +-- ESPressio Threads >= 3.1.4 < 4.0.0
     |
     +-- ESPressio Observable >= 3.0.1 < 4.0.0
     |
-    +-- ESPressio Timing >= 2.2.3 < 3.0.0
+    +-- ESPressio Timing >= 2.2.4 < 3.0.0
 ```
 
-ESPressio Units 0.2.2 is carried by the Timing dependency stack.
+ESPressio Units 0.2.3 is carried by the Timing dependency stack.
 
 **ESPressio Serializable is not a mandatory Event dependency.** It is
 required only when an application explicitly opts into Serializable
@@ -258,10 +258,10 @@ Events, runtime Serializable Event construction, or Event Transport. The
 validated current baseline is:
 
 ```text
-ESPressio Serializable >= 0.10.1 < 1.0.0
+ESPressio Serializable >= 0.10.2 < 1.0.0
 ```
 
-Security, Command, Sockets and ESP-Now remain optional bridge dependencies only. Event 5.8.1 introduces no new mandatory dependency on any of them.
+Security, Command, Sockets and ESP-Now remain optional bridge dependencies only. Event 5.8.2 introduces no new mandatory dependency on any of them.
 
 ### Dependency direction and transport-specific bridges
 
@@ -392,7 +392,7 @@ directly: the originating libraries expose synchronous Observer
 notifications, while ESPressio Event can optionally convert those
 notifications into asynchronous Events.
 
-Event 5.8 extends the same model to Security, Command, Sockets, and ESP-Now. The 5.8.1 dependency audit additionally distinguishes valid one-way bridges from transport-specific bridges that should ultimately move downstream to avoid reciprocal optional dependency edges.
+Event 5.8 extends the same model to Security, Command, Sockets, and ESP-Now. The 5.8.2 dependency audit additionally distinguishes valid one-way bridges from transport-specific bridges that should ultimately move downstream to avoid reciprocal optional dependency edges.
 
 ------------------------------------------------------------------------
 
@@ -1091,8 +1091,8 @@ Serializable explicitly:
 
 ``` ini
 lib_deps =
-    flowduino/ESPressio-Event@^5.8.1
-    flowduino/ESPressio-Serializable@^0.10.1
+    flowduino/ESPressio-Event@^5.8.2
+    flowduino/ESPressio-Serializable@^0.10.2
 ```
 
 ## `SerializableEvent`
@@ -1478,7 +1478,7 @@ payload length
 ```
 
 The payload uses the ESPressio Serializable **ESPB v2 binary wire format**.
-Event 5.8.1 validates against Serializable 0.10.1 while preserving the existing wire representation and direct binary transport path, with the archive path retained for compatibility/schema-migration cases.
+Event 5.8.2 validates against Serializable 0.10.2 while preserving the existing wire representation and direct binary transport path, with the archive path retained for compatibility/schema-migration cases.
 
 ## EventTransportManager observation
 

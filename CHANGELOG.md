@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.8.2 — 2026-08-21
+
+### Changed
+- Raised the required ESPressio Threads baseline from 3.1.3 to 3.1.4.
+- Raised the required ESPressio Timing baseline from 2.2.3 to 2.2.4.
+- Raised the optional ESPressio Serializable baseline from 0.10.1 to 0.10.2 for Serializable Events, runtime construction and Event Transport integrations.
+- Preserved the required ESPressio Observable baseline at `>=3.0.1 <4.0.0`.
+- Updated package, ESP-IDF component, README and dependency documentation for Event 5.8.2.
+- Preserved Security, Command, Sockets and ESP-Now as opt-in bridge dependencies and did not strengthen the existing Event↔ESP-Now or Event↔Sockets reciprocal optional relationships.
+
+### Compatibility
+- No Event, EventThread, listener, Observer, Event Transport, routing, bridge or wire-format API changes are introduced by this dependency-maintenance release.
+- Event Transport continues to use the existing ESPB v2 payload representation.
+
 ## 5.8.1 — 2026-08-20
 
 ### Changed
