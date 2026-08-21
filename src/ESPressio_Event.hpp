@@ -28,79 +28,83 @@ namespace ESPressio {
             public IEvent {
 
             private:
+                struct DispatchState {
+                    bool WasDispatched = false;
+                    uint64_t DispatchTimeNanoseconds = 0;
+
+                    bool operator==(
+                        const DispatchState& other
+                    ) const {
+                        return
+                            WasDispatched ==
+                                other.WasDispatched &&
+                            DispatchTimeNanoseconds ==
+                                other.DispatchTimeNanoseconds;
+                    }
+                };
+
+
+                class AtomicFlagGuard {
+                    private:
+                        std::atomic_flag& _flag;
+
+                    public:
+                        explicit AtomicFlagGuard(
+                            std::atomic_flag& flag
+                        ) noexcept :
+                            _flag(flag) {
+                            while (
+                                _flag.test_and_set(
+                                    std::memory_order_acquire
+                                )
+                            ) {
+                                /* Tiny lifecycle/context critical section. */
+                            }
+                        }
+
+                        ~AtomicFlagGuard() {
+                            _flag.clear(
+                                std::memory_order_release
+                            );
+                        }
+
+                        AtomicFlagGuard(
+                            const AtomicFlagGuard&
+                        ) = delete;
+
+                        AtomicFlagGuard& operator=(
+                            const AtomicFlagGuard&
+                        ) = delete;
+                };
+
+
                 /*
-                 * Event instances are intentionally short-lived, so lifecycle
-                 * metadata must not own pthread/FreeRTOS lock resources.
+                 * Event instances are intentionally short-lived. The previous
+                 * ReadWriteMutex members ultimately owned lazily-created
+                 * pthread/FreeRTOS rwlock resources on ESP32. Sustained Event
+                 * churn could therefore exhaust lock/heap resources.
                  *
-                 * 64-bit values are stored as two 32-bit atomics so this path
-                 * does not depend on a target-specific 64-bit atomic lock.
+                 * atomic_flag is guaranteed lock-free and owns no external
+                 * lock resource. Keep the original DispatchState and
+                 * EventDispatchContext representations intact so Event
+                 * Transport observes the same context semantics as 5.8.2.
                  */
-                static uint64_t CombineUInt64(
-                    uint32_t low,
-                    uint32_t high
-                ) noexcept {
-                    return
-                        static_cast<uint64_t>(low) |
-                        (static_cast<uint64_t>(high) << 32u);
-                }
+                mutable std::atomic_flag
+                    _dispatchStateGuard =
+                        ATOMIC_FLAG_INIT;
 
-
-                static uint32_t LowUInt32(
-                    uint64_t value
-                ) noexcept {
-                    return static_cast<uint32_t>(value);
-                }
-
-
-                static uint32_t HighUInt32(
-                    uint64_t value
-                ) noexcept {
-                    return static_cast<uint32_t>(value >> 32u);
-                }
-
+                DispatchState
+                    _dispatchState{};
 
                 std::atomic<uint32_t>
                     _refCount{0};
 
-                /*
-                 * Dispatch state:
-                 *   0 = not dispatched
-                 *   1 = timestamp being published
-                 *   2 = dispatched/timestamp ready
-                 */
-                std::atomic<uint8_t>
-                    _dispatchState{0};
+                mutable std::atomic_flag
+                    _dispatchContextGuard =
+                        ATOMIC_FLAG_INIT;
 
-                std::atomic<uint32_t>
-                    _dispatchTimeLow{0};
-
-                std::atomic<uint32_t>
-                    _dispatchTimeHigh{0};
-
-                /*
-                 * EventDispatchContext is published with a tiny sequence lock.
-                 * Every field is itself atomic, so readers/writers remain
-                 * data-race-free while the sequence guarantees one coherent
-                 * snapshot.
-                 */
-                mutable std::atomic<uint32_t>
-                    _dispatchContextSequence{0};
-
-                std::atomic<uint8_t>
-                    _dispatchContextOrigin{
-                        static_cast<uint8_t>(
-                            EventOrigin::Local
-                        )
-                    };
-
-                std::atomic<uint32_t>
-                    _dispatchContextMessageLow{0};
-
-                std::atomic<uint32_t>
-                    _dispatchContextMessageHigh{0};
-
-                std::atomic<uint8_t>
-                    _dispatchContextHopCount{0};
+                EventDispatchContext
+                    _dispatchContext{};
 
 
                 static uint64_t
@@ -167,35 +171,13 @@ namespace ESPressio {
                 }
 
 
-                uint64_t
-                ReadDispatchTimeNanoseconds() const noexcept {
-                    while (
-                        _dispatchState.load(
-                            std::memory_order_acquire
-                        ) == 1
-                    ) {
-                        /* publication is only two atomic stores */
-                    }
+                DispatchState
+                GetDispatchState() const noexcept {
+                    AtomicFlagGuard lock(
+                        _dispatchStateGuard
+                    );
 
-                    if (
-                        _dispatchState.load(
-                            std::memory_order_acquire
-                        ) != 2
-                    ) {
-                        return 0;
-                    }
-
-                    const uint32_t low =
-                        _dispatchTimeLow.load(
-                            std::memory_order_relaxed
-                        );
-
-                    const uint32_t high =
-                        _dispatchTimeHigh.load(
-                            std::memory_order_relaxed
-                        );
-
-                    return CombineUInt64(low, high);
+                    return _dispatchState;
                 }
 
 
@@ -248,122 +230,44 @@ namespace ESPressio {
                 void __setDispatchContext(
                     const EventDispatchContext& context
                 ) override {
-                    _dispatchContextSequence.fetch_add(
-                        1,
-                        std::memory_order_acq_rel
+                    AtomicFlagGuard lock(
+                        _dispatchContextGuard
                     );
 
-                    _dispatchContextOrigin.store(
-                        static_cast<uint8_t>(context.Origin),
-                        std::memory_order_relaxed
-                    );
-
-                    _dispatchContextMessageLow.store(
-                        LowUInt32(context.TransportMessageID),
-                        std::memory_order_relaxed
-                    );
-
-                    _dispatchContextMessageHigh.store(
-                        HighUInt32(context.TransportMessageID),
-                        std::memory_order_relaxed
-                    );
-
-                    _dispatchContextHopCount.store(
-                        context.HopCount,
-                        std::memory_order_relaxed
-                    );
-
-                    _dispatchContextSequence.fetch_add(
-                        1,
-                        std::memory_order_release
-                    );
+                    _dispatchContext = context;
                 }
 
 
                 EventDispatchContext
                 __getDispatchContext() const override {
-                    for (;;) {
-                        const uint32_t before =
-                            _dispatchContextSequence.load(
-                                std::memory_order_acquire
-                            );
+                    AtomicFlagGuard lock(
+                        _dispatchContextGuard
+                    );
 
-                        if ((before & 1u) != 0u) {
-                            continue;
-                        }
-
-                        EventDispatchContext result;
-                        result.Origin =
-                            static_cast<EventOrigin>(
-                                _dispatchContextOrigin.load(
-                                    std::memory_order_relaxed
-                                )
-                            );
-
-                        const uint32_t low =
-                            _dispatchContextMessageLow.load(
-                                std::memory_order_relaxed
-                            );
-
-                        const uint32_t high =
-                            _dispatchContextMessageHigh.load(
-                                std::memory_order_relaxed
-                            );
-
-                        result.TransportMessageID =
-                            CombineUInt64(low, high);
-
-                        result.HopCount =
-                            _dispatchContextHopCount.load(
-                                std::memory_order_relaxed
-                            );
-
-                        const uint32_t after =
-                            _dispatchContextSequence.load(
-                                std::memory_order_acquire
-                            );
-
-                        if (
-                            before == after &&
-                            (after & 1u) == 0u
-                        ) {
-                            return result;
-                        }
-                    }
+                    return _dispatchContext;
                 }
 
 
                 void __dispatch() override {
-                    uint8_t expected = 0;
-
-                    if (
-                        !_dispatchState.compare_exchange_strong(
-                            expected,
-                            1,
-                            std::memory_order_acq_rel,
-                            std::memory_order_acquire
-                        )
-                    ) {
-                        return;
-                    }
-
                     const uint64_t now =
                         GetNowNanoseconds();
 
-                    _dispatchTimeLow.store(
-                        LowUInt32(now),
-                        std::memory_order_relaxed
+                    AtomicFlagGuard lock(
+                        _dispatchStateGuard
                     );
 
-                    _dispatchTimeHigh.store(
-                        HighUInt32(now),
-                        std::memory_order_relaxed
-                    );
+                    if (
+                        !_dispatchState.
+                            WasDispatched
+                    ) {
+                        _dispatchState.
+                            WasDispatched =
+                                true;
 
-                    _dispatchState.store(
-                        2,
-                        std::memory_order_release
-                    );
+                        _dispatchState.
+                            DispatchTimeNanoseconds =
+                                now;
+                    }
                 }
 
 
@@ -396,7 +300,15 @@ namespace ESPressio {
                 uint64_t
                 GetDispatchTimeNanoseconds()
                     const override {
-                    return ReadDispatchTimeNanoseconds();
+
+                    const DispatchState state =
+                        GetDispatchState();
+
+                    return
+                        state.WasDispatched
+                            ? state.
+                                DispatchTimeNanoseconds
+                            : 0;
                 }
 
 
@@ -404,10 +316,10 @@ namespace ESPressio {
                 GetTimeSinceDispatchNanoseconds()
                     const override {
 
-                    const uint64_t dispatchTime =
-                        ReadDispatchTimeNanoseconds();
+                    const DispatchState state =
+                        GetDispatchState();
 
-                    if (dispatchTime == 0) {
+                    if (!state.WasDispatched) {
                         return 0;
                     }
 
@@ -415,8 +327,12 @@ namespace ESPressio {
                         GetNowNanoseconds();
 
                     return
-                        now >= dispatchTime
-                            ? now - dispatchTime
+                        now >=
+                            state.
+                                DispatchTimeNanoseconds
+                            ? now -
+                                state.
+                                    DispatchTimeNanoseconds
                             : 0;
                 }
 
