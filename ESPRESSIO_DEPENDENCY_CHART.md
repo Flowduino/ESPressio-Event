@@ -1,6 +1,6 @@
 # ESPressio Dependency Chart — Event 5.8.4
 
-![ESPressio Library Dependency Chart](ESPRESSIO_DEPENDENCY_CHART.png)
+![ESPressio Library Dependency Chart](ESPRESSIO_DEPENDENCY_CHART.svg)
 
 ## Required dependencies
 
