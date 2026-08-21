@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.8.4 — 2026-08-21
+
+### Changed
+- Raised the validated optional ESPressio ESP-Now baseline from 0.5.2 to 0.5.3 for `ESPNowTransportEventBridge` integration.
+- Updated CI to compile the ESP-Now bridge against released ESPressio ESP-Now 0.5.3.
+- Preserved the required dependency baselines at Threads `>=3.1.4 <4.0.0`, Timing `>=2.2.4 <3.0.0`, and Observable `>=3.0.1 <4.0.0`.
+- Preserved Serializable `>=0.10.2 <1.0.0` as the validated optional baseline for Serializable Events and Event Transport.
+- Preserved the allocation-free Event lifecycle synchronization fix released in 5.8.3 unchanged.
+- Updated package metadata, README, changelog, and both textual and graphical dependency charts for the coordinated 5.8.4 ecosystem state.
+
+### Compatibility
+- No Event, EventThread, listener, Observer, Serializable Event, Event Transport, routing, bridge, or wire-format API changes are introduced by this dependency-maintenance patch.
+- ESP-Now, Sockets, Security, Command, and Serializable integrations remain opt-in.
+- The Event Transport envelope and ESPB v2 payload representation are unchanged.
+
 ## 5.8.3 — 2026-08-21
 
 ### Fixed
