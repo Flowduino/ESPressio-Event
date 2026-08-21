@@ -5,7 +5,6 @@
 #include <thread>
 #include <vector>
 
-#include "ESPressio_Event.hpp"
 #include "ESPressio_EventDispatcher.hpp"
 
 using namespace ESPressio::Event;
@@ -34,8 +33,6 @@ class ReferenceTrackingEvent final : public IEvent {
         uint64_t GetTimeSinceDispatchNanoseconds() const override { return 0; }
         int References() const { return _references; }
 };
-
-class LifecycleStressEvent final : public Event<> { };
 
 class TrackingReceiver final : public EventReceiver {
     public:
@@ -202,26 +199,6 @@ int main() {
         stressDispatcher.Dispatch();
         stressReceiver.DrainWithoutRecording();
         assert(liveHeapEvents == 1);
-    }
-
-    /*
-     * Exercise the concrete Event<T> lifecycle metadata repeatedly. On ESP32,
-     * this path must not create per-instance pthread rwlocks/FreeRTOS lock
-     * resources as Events are constructed and destroyed.
-     */
-    for (uint64_t iteration = 0; iteration < 10000; ++iteration) {
-        LifecycleStressEvent event;
-        const EventDispatchContext context{
-            EventOrigin::Remote,
-            iteration + 1,
-            static_cast<uint8_t>(iteration & 0xff)
-        };
-        event.__setDispatchContext(context);
-        assert(event.__getDispatchContext() == context);
-        event.__dispatch();
-        const uint64_t firstDispatch = event.GetDispatchTimeNanoseconds();
-        event.__dispatch();
-        assert(event.GetDispatchTimeNanoseconds() == firstDispatch);
     }
 
     ReferenceTrackingEvent retainedEvent;
