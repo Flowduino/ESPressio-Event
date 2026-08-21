@@ -2,10 +2,10 @@
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 
 #include <ESPressio_SystemClock.hpp>
 #include <ESPressio_TimeTraits.hpp>
-#include <ESPressio_ThreadSafe.hpp>
 
 #include "ESPressio_IEvent.hpp"
 #include "ESPressio_EventEnums.hpp"
@@ -45,17 +45,25 @@ namespace ESPressio {
                 };
 
 
-                mutable Threads::ReadWriteMutex<
-                    DispatchState
-                > _dispatchState{
-                    DispatchState()
-                };
+                /*
+                 * Event instances are intentionally short-lived. Keeping a
+                 * std::shared_mutex/ReadWriteMutex inside every Event causes
+                 * ESP32 pthread rwlock resources to be lazily allocated for
+                 * each instance. Under sustained Event churn this can exhaust
+                 * internal lock/heap resources.
+                 *
+                 * Lifecycle metadata is tiny and its critical sections are
+                 * extremely short, so serialize it through one long-lived
+                 * mutex per Event<TTime> specialization instead.
+                 */
+                inline static std::mutex _lifecycleMutex;
+
+                DispatchState _dispatchState{};
 
                 std::atomic<uint32_t>
                     _refCount{0};
 
-                mutable Threads::ReadWriteMutex<EventDispatchContext>
-                    _dispatchContext{EventDispatchContext()};
+                EventDispatchContext _dispatchContext{};
 
 
                 static uint64_t
@@ -171,23 +179,19 @@ namespace ESPressio {
                 void __setDispatchContext(
                     const EventDispatchContext& context
                 ) override {
-                    _dispatchContext.WithWriteLock(
-                        [&](EventDispatchContext& current) {
-                            current = context;
-                        }
+                    std::lock_guard<std::mutex> lock(
+                        _lifecycleMutex
                     );
+                    _dispatchContext = context;
                 }
 
 
                 EventDispatchContext
                 __getDispatchContext() const override {
-                    EventDispatchContext result;
-                    _dispatchContext.WithSharedReadLock(
-                        [&](const EventDispatchContext& current) {
-                            result = current;
-                        }
+                    std::lock_guard<std::mutex> lock(
+                        _lifecycleMutex
                     );
-                    return result;
+                    return _dispatchContext;
                 }
 
 
@@ -195,26 +199,14 @@ namespace ESPressio {
                     const uint64_t now =
                         GetNowNanoseconds();
 
-                    _dispatchState.
-                        WithWriteLock(
-                            [now](
-                                DispatchState&
-                                    state
-                            ) {
-                                if (
-                                    !state.
-                                        WasDispatched
-                                ) {
-                                    state.
-                                        WasDispatched =
-                                            true;
+                    std::lock_guard<std::mutex> lock(
+                        _lifecycleMutex
+                    );
 
-                                    state.
-                                        DispatchTimeNanoseconds =
-                                            now;
-                                }
-                            }
-                        );
+                    if (!_dispatchState.WasDispatched) {
+                        _dispatchState.WasDispatched = true;
+                        _dispatchState.DispatchTimeNanoseconds = now;
+                    }
                 }
 
 
@@ -248,8 +240,13 @@ namespace ESPressio {
                 GetDispatchTimeNanoseconds()
                     const override {
 
-                    const DispatchState state =
-                        _dispatchState.Get();
+                    DispatchState state;
+                    {
+                        std::lock_guard<std::mutex> lock(
+                            _lifecycleMutex
+                        );
+                        state = _dispatchState;
+                    }
 
                     return
                         state.WasDispatched
@@ -263,8 +260,13 @@ namespace ESPressio {
                 GetTimeSinceDispatchNanoseconds()
                     const override {
 
-                    const DispatchState state =
-                        _dispatchState.Get();
+                    DispatchState state;
+                    {
+                        std::lock_guard<std::mutex> lock(
+                            _lifecycleMutex
+                        );
+                        state = _dispatchState;
+                    }
 
                     if (!state.WasDispatched) {
                         return 0;
