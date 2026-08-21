@@ -1,10 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820">
   <style>
     text { font-family: Arial, Helvetica, sans-serif; fill: #111; }
     .title { font-size: 28px; font-weight: 700; }
     .section { font-size: 18px; font-weight: 700; }
     .node { fill: #fff; stroke: #222; stroke-width: 2; rx: 8; }
     .label { font-size: 16px; }
+    .small { font-size: 13px; }
     .edge { stroke: #222; stroke-width: 2; fill: none; marker-end: url(#arrow); }
     .optional { stroke-dasharray: 8 6; }
   </style>
@@ -13,41 +14,39 @@
       <path d="M0,0 L0,6 L9,3 z" fill="#222"/>
     </marker>
   </defs>
-  <text class="title" x="40" y="45">ESPressio Dependency Chart — Event 5.8.4</text>
-  <text class="section" x="40" y="90">Foundational</text>
-  <rect class="node" x="40" y="110" width="200" height="55"/><text class="label" x="60" y="143">Observable 3.0.1</text>
-  <rect class="node" x="270" y="110" width="200" height="55"/><text class="label" x="290" y="143">Serializable 0.10.2</text>
-  <rect class="node" x="500" y="110" width="160" height="55"/><text class="label" x="520" y="143">Units 0.2.3</text>
-  <rect class="node" x="690" y="110" width="170" height="55"/><text class="label" x="710" y="143">Security 0.2.0</text>
-  <rect class="node" x="890" y="110" width="180" height="55"/><text class="label" x="910" y="143">Command 0.3.0</text>
 
-  <text class="section" x="40" y="220">Runtime / Execution</text>
-  <rect class="node" x="160" y="245" width="220" height="55"/><text class="label" x="185" y="278">Timing 2.2.4</text>
-  <rect class="node" x="520" y="245" width="220" height="55"/><text class="label" x="545" y="278">Threads 3.1.4</text>
+  <text class="title" x="40" y="45">ESPressio Dependency Chart — Event 6.0.0</text>
 
-  <text class="section" x="40" y="360">Transport / Integration</text>
-  <rect class="node" x="80" y="385" width="200" height="55"/><text class="label" x="105" y="418">Sockets 0.5.0</text>
-  <rect class="node" x="380" y="385" width="220" height="55"/><text class="label" x="405" y="418">ESP-Now 0.5.3</text>
+  <text class="section" x="40" y="90">Foundational / domain</text>
+  <rect class="node" x="40" y="110" width="185" height="55"/><text class="label" x="60" y="143">Observable 3.0.1</text>
+  <rect class="node" x="245" y="110" width="195" height="55"/><text class="label" x="265" y="143">Serializable 0.10.2</text>
+  <rect class="node" x="460" y="110" width="145" height="55"/><text class="label" x="480" y="143">Units 0.2.3</text>
+  <rect class="node" x="625" y="110" width="175" height="55"/><text class="label" x="645" y="143">Security 0.3.0</text>
+  <rect class="node" x="820" y="110" width="175" height="55"/><text class="label" x="840" y="143">Command 0.4.0</text>
 
-  <text class="section" x="40" y="500">Event</text>
-  <rect class="node" x="480" y="510" width="240" height="65"/><text class="label" x="530" y="548">Event 5.8.4</text>
+  <text class="section" x="40" y="215">Runtime / execution</text>
+  <rect class="node" x="205" y="240" width="190" height="55"/><text class="label" x="230" y="273">Timing 2.2.4</text>
+  <rect class="node" x="535" y="240" width="190" height="55"/><text class="label" x="560" y="273">Threads 3.1.4</text>
+  <path class="edge" d="M300 240 L530 165"/><path class="edge" d="M270 240 L150 165"/>
+  <path class="edge" d="M600 240 L365 165"/><path class="edge" d="M570 240 L195 165"/>
 
-  <text class="section" x="40" y="650">Diagnostics / Operator</text>
-  <rect class="node" x="480" y="665" width="240" height="55"/><text class="label" x="530" y="698">Serial 0.5.1</text>
+  <text class="section" x="40" y="350">Generic Event mechanism</text>
+  <rect class="node" x="460" y="375" width="230" height="70"/><text class="label" x="505" y="415">Event 6.0.0</text>
+  <path class="edge" d="M535 375 L325 295"/><path class="edge" d="M610 375 L625 295"/><path class="edge" d="M495 375 L190 165"/>
+  <path class="edge optional" d="M520 375 L350 165"/>
 
-  <path class="edge" d="M580 165 L300 245"/><text class="label" x="385" y="200">required</text>
-  <path class="edge" d="M240 137 L230 245"/><text class="label" x="110" y="205">required</text>
-  <path class="edge" d="M380 272 L520 272"/><text class="label" x="420" y="258">required</text>
-  <path class="edge" d="M240 137 L630 245"/><text class="label" x="430" y="188">required</text>
-  <path class="edge" d="M630 300 L600 510"/><text class="label" x="620" y="405">required</text>
-  <path class="edge" d="M300 300 L540 510"/><text class="label" x="345" y="405">required</text>
-  <path class="edge" d="M140 165 L510 510"/><text class="label" x="260" y="335">required</text>
-  <path class="edge optional" d="M370 165 L570 510"/><text class="label" x="400" y="355">optional</text>
-  <path class="edge optional" d="M490 440 L560 510"/><text class="label" x="430" y="485">optional bridge</text>
-  <path class="edge optional" d="M560 510 L490 440"/><text class="label" x="595" y="478">optional Event transport</text>
-  <path class="edge optional" d="M600 575 L600 665"/><text class="label" x="620" y="625">downstream</text>
+  <text class="section" x="40" y="505">Domain-owned optional Event integrations</text>
+  <rect class="node" x="55" y="535" width="190" height="55"/><text class="label" x="80" y="568">Security 0.3.0</text>
+  <rect class="node" x="275" y="535" width="190" height="55"/><text class="label" x="300" y="568">Command 0.4.0</text>
+  <rect class="node" x="495" y="535" width="190" height="55"/><text class="label" x="520" y="568">Sockets 0.6.0</text>
+  <rect class="node" x="715" y="535" width="190" height="55"/><text class="label" x="740" y="568">ESP-Now 0.6.0</text>
+  <path class="edge optional" d="M150 535 L485 445"/>
+  <path class="edge optional" d="M370 535 L525 445"/>
+  <path class="edge optional" d="M590 535 L575 445"/>
+  <path class="edge optional" d="M810 535 L650 445"/>
 
-  <text class="label" x="790" y="530">Solid arrows = required dependency</text>
-  <text class="label" x="790" y="560">Dashed arrows = optional integration</text>
-  <text class="label" x="790" y="590">ESP-Now 0.5.3 is the validated bridge baseline for Event 5.8.4</text>
+  <text class="section" x="40" y="650">Diagnostics / operator</text>
+  <rect class="node" x="480" y="675" width="220" height="55"/><text class="label" x="525" y="708">Serial 0.6.0</text>
+
+  <text class="small" x="40" y="775">Solid arrows: required dependencies. Dashed arrows: opt-in dependencies. No reciprocal Event/domain edges remain.</text>
 </svg>
