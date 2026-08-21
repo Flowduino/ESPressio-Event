@@ -1,26 +1,26 @@
-# ESPressio Dependency Chart — Event 5.8.1
+# ESPressio Dependency Chart — Event 5.8.2
 
 ![ESPressio Library Dependency Chart](ESPRESSIO_DEPENDENCY_CHART.png)
 
 ## Required dependencies
 
 ```text
-ESPressio Event 5.8.1
-    -> ESPressio Threads >= 3.1.3 < 4.0.0
-    -> ESPressio Timing >= 2.2.3 < 3.0.0
+ESPressio Event 5.8.2
+    -> ESPressio Threads >= 3.1.4 < 4.0.0
+    -> ESPressio Timing >= 2.2.4 < 3.0.0
     -> ESPressio Observable >= 3.0.1 < 4.0.0
 ```
 
 The transitive required chain is:
 
 ```text
-Event 5.8.1
-    -> Threads 3.1.3
-        -> Timing 2.2.3
-            -> Units 0.2.2
+Event 5.8.2
+    -> Threads 3.1.4
+        -> Timing 2.2.4
+            -> Units 0.2.3
         -> Observable 3.0.1
-    -> Timing 2.2.3
-        -> Units 0.2.2
+    -> Timing 2.2.4
+        -> Units 0.2.3
         -> Observable 3.0.1
     -> Observable 3.0.1
 ```
@@ -31,11 +31,12 @@ Ordinary local Event use does not require Serializable. Serializable Events,
 runtime Serializable Event construction, and Event Transport require:
 
 ```text
-ESPressio Serializable >= 0.10.1 < 1.0.0
+ESPressio Serializable >= 0.10.2 < 1.0.0
 ```
 
-Serializable 0.10.1 preserves the ESPB v2 wire representation while adding
-bounded/allocation-free inspection facilities. Event's transport wire format is
+Serializable 0.10.2 preserves the ESPB v2 wire representation while retaining
+bounded/allocation-free inspection facilities and correcting the strict-build
+warning exposed by downstream consumers. Event's transport wire format is
 unchanged by this dependency refresh.
 
 ## Optional Observer-to-Event bridges
@@ -57,31 +58,32 @@ do not become mandatory Event dependencies merely because bridge headers exist.
 ```text
 FOUNDATIONAL
 ├── Observable 3.0.1
-├── Serializable 0.10.1
-├── Units 0.2.2
+├── Serializable 0.10.2
+├── Units 0.2.3
 ├── Security 0.2.0
 └── Command 0.3.0
 
 RUNTIME
-└── Timing 2.2.3
+└── Timing 2.2.4
 
 EXECUTION
-└── Threads 3.1.3
+└── Threads 3.1.4
 
 TRANSPORT / INTEGRATION
 ├── Sockets 0.5.0
-└── ESP-Now 0.5.1
+└── ESP-Now 0.5.2
 
 EVENT
-└── Event 5.8.1
+└── Event 5.8.2
 
 DIAGNOSTICS / OPERATOR
-└── Serial 0.5.1
+└── Serial 0.5.1 (release candidate)
 ```
 
 ## Circular-dependency audit
 
-There is one currently known reciprocal optional relationship:
+There are two reciprocal optional relationships that should be removed in a
+future architecture cleanup:
 
 ```text
 ESP-Now - - -> Event
@@ -91,14 +93,25 @@ Event - - -> ESP-Now
     ESPNowTransportEventBridge
 ```
 
-Although neither edge is mandatory, this violates the desired dependency rule:
-integration dependencies should cascade downstream and must not point back into
-a consumer that already depends on the abstraction.
+and:
+
+```text
+Sockets - - -> Event
+    socket Event transports
+
+Event - - -> Sockets
+    SocketWorkerEventBridge
+    SocketSecuritySessionEventBridge
+```
+
+Although none of these edges is mandatory, each pair violates the desired
+dependency rule: integration dependencies should cascade downstream and must not
+point back into a consumer that already depends on the abstraction.
 
 ### Preferred resolution
 
-Event should remain the upstream, transport-neutral abstraction. The
-ESP-Now-specific Observer-to-Event bridge should move downstream:
+Event should remain the upstream, transport-neutral abstraction. Transport-
+specific Observer-to-Event bridges should move downstream:
 
 ```text
 Event
@@ -109,14 +122,19 @@ Event
 ESP-Now Event integration
   ├── ESPNowEventTransport
   └── ESPNowTransportEventBridge
+
+Sockets Event integration
+  ├── socket Event transports
+  ├── SocketWorkerEventBridge
+  └── SocketSecuritySessionEventBridge
 ```
 
-A dedicated integration package would also be valid if keeping both libraries
-completely unaware of one another is preferable.
+Dedicated integration packages would also be valid if keeping the core
+libraries completely unaware of one another is preferable.
 
-Until that relocation occurs, Event 5.8.1 does not add or strengthen any new
-Event -> ESP-Now package-level dependency. The existing bridge remains available
-for compatibility only.
+Until those relocations occur, Event 5.8.2 does not add or strengthen any new
+Event -> ESP-Now or Event -> Sockets package-level dependency. Existing bridge
+headers remain available for compatibility only.
 
 ## Dependency-direction rule
 
