@@ -21,7 +21,7 @@
         "type": "git",
         "url": "https://github.com/Flowduino/ESPressio-Event.git"
     },
-    "version": "5.8.2",
+    "version": "5.8.3",
     "license": "Apache-2.0",
     "frameworks": "arduino",
     "platforms": "espressif32",
