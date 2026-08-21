@@ -2,7 +2,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <mutex>
 
 #include <ESPressio_SystemClock.hpp>
 #include <ESPressio_TimeTraits.hpp>
@@ -29,41 +28,79 @@ namespace ESPressio {
             public IEvent {
 
             private:
-                struct DispatchState {
-                    bool WasDispatched = false;
-                    uint64_t DispatchTimeNanoseconds = 0;
-
-                    bool operator==(
-                        const DispatchState& other
-                    ) const {
-                        return
-                            WasDispatched ==
-                                other.WasDispatched &&
-                            DispatchTimeNanoseconds ==
-                                other.DispatchTimeNanoseconds;
-                    }
-                };
-
-
                 /*
-                 * Event instances are intentionally short-lived. Keeping a
-                 * std::shared_mutex/ReadWriteMutex inside every Event causes
-                 * ESP32 pthread rwlock resources to be lazily allocated for
-                 * each instance. Under sustained Event churn this can exhaust
-                 * internal lock/heap resources.
+                 * Event instances are intentionally short-lived, so lifecycle
+                 * metadata must not own pthread/FreeRTOS lock resources.
                  *
-                 * Lifecycle metadata is tiny and its critical sections are
-                 * extremely short, so serialize it through one long-lived
-                 * mutex per Event<TTime> specialization instead.
+                 * 64-bit values are stored as two 32-bit atomics so this path
+                 * does not depend on a target-specific 64-bit atomic lock.
                  */
-                inline static std::mutex _lifecycleMutex;
+                static uint64_t CombineUInt64(
+                    uint32_t low,
+                    uint32_t high
+                ) noexcept {
+                    return
+                        static_cast<uint64_t>(low) |
+                        (static_cast<uint64_t>(high) << 32u);
+                }
 
-                DispatchState _dispatchState{};
+
+                static uint32_t LowUInt32(
+                    uint64_t value
+                ) noexcept {
+                    return static_cast<uint32_t>(value);
+                }
+
+
+                static uint32_t HighUInt32(
+                    uint64_t value
+                ) noexcept {
+                    return static_cast<uint32_t>(value >> 32u);
+                }
+
 
                 std::atomic<uint32_t>
                     _refCount{0};
 
-                EventDispatchContext _dispatchContext{};
+                /*
+                 * Dispatch state:
+                 *   0 = not dispatched
+                 *   1 = timestamp being published
+                 *   2 = dispatched/timestamp ready
+                 */
+                std::atomic<uint8_t>
+                    _dispatchState{0};
+
+                std::atomic<uint32_t>
+                    _dispatchTimeLow{0};
+
+                std::atomic<uint32_t>
+                    _dispatchTimeHigh{0};
+
+                /*
+                 * EventDispatchContext is published with a tiny sequence lock.
+                 * Every field is itself atomic, so readers/writers remain
+                 * data-race-free while the sequence guarantees one coherent
+                 * snapshot.
+                 */
+                mutable std::atomic<uint32_t>
+                    _dispatchContextSequence{0};
+
+                std::atomic<uint8_t>
+                    _dispatchContextOrigin{
+                        static_cast<uint8_t>(
+                            EventOrigin::Local
+                        )
+                    };
+
+                std::atomic<uint32_t>
+                    _dispatchContextMessageLow{0};
+
+                std::atomic<uint32_t>
+                    _dispatchContextMessageHigh{0};
+
+                std::atomic<uint8_t>
+                    _dispatchContextHopCount{0};
 
 
                 static uint64_t
@@ -130,6 +167,38 @@ namespace ESPressio {
                 }
 
 
+                uint64_t
+                ReadDispatchTimeNanoseconds() const noexcept {
+                    while (
+                        _dispatchState.load(
+                            std::memory_order_acquire
+                        ) == 1
+                    ) {
+                        /* publication is only two atomic stores */
+                    }
+
+                    if (
+                        _dispatchState.load(
+                            std::memory_order_acquire
+                        ) != 2
+                    ) {
+                        return 0;
+                    }
+
+                    const uint32_t low =
+                        _dispatchTimeLow.load(
+                            std::memory_order_relaxed
+                        );
+
+                    const uint32_t high =
+                        _dispatchTimeHigh.load(
+                            std::memory_order_relaxed
+                        );
+
+                    return CombineUInt64(low, high);
+                }
+
+
             public:
                 using TimeType = TTime;
 
@@ -179,34 +248,122 @@ namespace ESPressio {
                 void __setDispatchContext(
                     const EventDispatchContext& context
                 ) override {
-                    std::lock_guard<std::mutex> lock(
-                        _lifecycleMutex
+                    _dispatchContextSequence.fetch_add(
+                        1,
+                        std::memory_order_acq_rel
                     );
-                    _dispatchContext = context;
+
+                    _dispatchContextOrigin.store(
+                        static_cast<uint8_t>(context.Origin),
+                        std::memory_order_relaxed
+                    );
+
+                    _dispatchContextMessageLow.store(
+                        LowUInt32(context.TransportMessageID),
+                        std::memory_order_relaxed
+                    );
+
+                    _dispatchContextMessageHigh.store(
+                        HighUInt32(context.TransportMessageID),
+                        std::memory_order_relaxed
+                    );
+
+                    _dispatchContextHopCount.store(
+                        context.HopCount,
+                        std::memory_order_relaxed
+                    );
+
+                    _dispatchContextSequence.fetch_add(
+                        1,
+                        std::memory_order_release
+                    );
                 }
 
 
                 EventDispatchContext
                 __getDispatchContext() const override {
-                    std::lock_guard<std::mutex> lock(
-                        _lifecycleMutex
-                    );
-                    return _dispatchContext;
+                    for (;;) {
+                        const uint32_t before =
+                            _dispatchContextSequence.load(
+                                std::memory_order_acquire
+                            );
+
+                        if ((before & 1u) != 0u) {
+                            continue;
+                        }
+
+                        EventDispatchContext result;
+                        result.Origin =
+                            static_cast<EventOrigin>(
+                                _dispatchContextOrigin.load(
+                                    std::memory_order_relaxed
+                                )
+                            );
+
+                        const uint32_t low =
+                            _dispatchContextMessageLow.load(
+                                std::memory_order_relaxed
+                            );
+
+                        const uint32_t high =
+                            _dispatchContextMessageHigh.load(
+                                std::memory_order_relaxed
+                            );
+
+                        result.TransportMessageID =
+                            CombineUInt64(low, high);
+
+                        result.HopCount =
+                            _dispatchContextHopCount.load(
+                                std::memory_order_relaxed
+                            );
+
+                        const uint32_t after =
+                            _dispatchContextSequence.load(
+                                std::memory_order_acquire
+                            );
+
+                        if (
+                            before == after &&
+                            (after & 1u) == 0u
+                        ) {
+                            return result;
+                        }
+                    }
                 }
 
 
                 void __dispatch() override {
+                    uint8_t expected = 0;
+
+                    if (
+                        !_dispatchState.compare_exchange_strong(
+                            expected,
+                            1,
+                            std::memory_order_acq_rel,
+                            std::memory_order_acquire
+                        )
+                    ) {
+                        return;
+                    }
+
                     const uint64_t now =
                         GetNowNanoseconds();
 
-                    std::lock_guard<std::mutex> lock(
-                        _lifecycleMutex
+                    _dispatchTimeLow.store(
+                        LowUInt32(now),
+                        std::memory_order_relaxed
                     );
 
-                    if (!_dispatchState.WasDispatched) {
-                        _dispatchState.WasDispatched = true;
-                        _dispatchState.DispatchTimeNanoseconds = now;
-                    }
+                    _dispatchTimeHigh.store(
+                        HighUInt32(now),
+                        std::memory_order_relaxed
+                    );
+
+                    _dispatchState.store(
+                        2,
+                        std::memory_order_release
+                    );
                 }
 
 
@@ -239,20 +396,7 @@ namespace ESPressio {
                 uint64_t
                 GetDispatchTimeNanoseconds()
                     const override {
-
-                    DispatchState state;
-                    {
-                        std::lock_guard<std::mutex> lock(
-                            _lifecycleMutex
-                        );
-                        state = _dispatchState;
-                    }
-
-                    return
-                        state.WasDispatched
-                            ? state.
-                                DispatchTimeNanoseconds
-                            : 0;
+                    return ReadDispatchTimeNanoseconds();
                 }
 
 
@@ -260,15 +404,10 @@ namespace ESPressio {
                 GetTimeSinceDispatchNanoseconds()
                     const override {
 
-                    DispatchState state;
-                    {
-                        std::lock_guard<std::mutex> lock(
-                            _lifecycleMutex
-                        );
-                        state = _dispatchState;
-                    }
+                    const uint64_t dispatchTime =
+                        ReadDispatchTimeNanoseconds();
 
-                    if (!state.WasDispatched) {
+                    if (dispatchTime == 0) {
                         return 0;
                     }
 
@@ -276,12 +415,8 @@ namespace ESPressio {
                         GetNowNanoseconds();
 
                     return
-                        now >=
-                            state.
-                                DispatchTimeNanoseconds
-                            ? now -
-                                state.
-                                    DispatchTimeNanoseconds
+                        now >= dispatchTime
+                            ? now - dispatchTime
                             : 0;
                 }
 
