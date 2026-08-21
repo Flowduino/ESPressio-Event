@@ -12,7 +12,7 @@ optional transport-neutral Serializable Event routing.
 
 ## Current Version — 5.8.2
 
-ESPressio Event **5.8.2** is a dependency-maintenance patch over 5.8.0. It retains the expanded Observable-to-Event bridge surface while refreshing the validated upstream dependency baselines.
+ESPressio Event **5.8.2** is a dependency-maintenance patch over 5.8.1. It retains the expanded Observable-to-Event bridge surface while refreshing the validated upstream dependency baselines.
 
 Current dependency model:
 
