@@ -1,5 +1,35 @@
 # Changelog
 
+## 6.0.0 — 2026-08-21
+
+### Removed
+- Removed ESP-Now-specific Event types and `ESPNowTransportEventBridge` from ESPressio Event. Their ownership moves to ESPressio ESP-Now 0.6.0.
+- Removed Sockets-specific Event types, `SocketWorkerEventBridge`, and `SocketSecuritySessionEventBridge` from ESPressio Event. Their ownership moves to ESPressio Sockets 0.6.0.
+- Removed Command-specific Event types and `CommandRegistryEventBridge` from ESPressio Event. Their ownership moves to ESPressio Command 0.4.0.
+- Removed Security-specific Event types and `TransportSecurityEventBridge` from ESPressio Event. Their ownership moves to ESPressio Security 0.3.0.
+
+### Changed
+- Established Event as a mechanism-only library: Event now owns generic Event lifecycle, dispatch, observation, Serializable Event support, and transport-neutral Event Transport abstractions rather than concrete domain integrations it does not otherwise consume.
+- Retained Timing/SystemClock Event bridges because Event directly consumes Timing for lifecycle timing and is already the legitimate downstream dependency.
+- Retained Threads infrastructure Event bridges because Event directly consumes Threads for asynchronous execution and is already the legitimate downstream dependency.
+- Audited Event's direct dependency set and confirmed Threads `>=3.1.4 <4.0.0`, Timing `>=2.2.4 <3.0.0`, and Observable `>=3.0.1 <4.0.0` are genuine direct requirements of the generic Event mechanism.
+- Retained Serializable `>=0.10.2 <1.0.0` as an opt-in dependency for Serializable Events and Event Transport.
+- Added explicit dependency-boundary documentation and CI enforcement preventing Event from regaining source or package-level dependencies on ESP-Now, Sockets, Command, or Security merely to host concrete adapters.
+- Updated package metadata, README, textual dependency chart, and graphical dependency chart for Event 6.0.0 and the final coordinated release generation.
+
+### Compatibility
+- This is intentionally a source-breaking major release for applications that obtained Command, Security, Sockets, or ESP-Now Event integration headers from ESPressio Event.
+- Public header and class names are preserved in their new owning libraries where those names remain unambiguous; applications must depend on the appropriate domain library release.
+- Core Event APIs, EventThread APIs, listener/receiver behavior, Event lifecycle timing, Serializable Event semantics, Event Transport routing, the EVTT envelope, and ESPB v2 payload representation are unchanged.
+
+### Tracking
+- ESP-Now integration relocation: #33
+- Sockets integration relocation: #34
+- Command integration relocation: #35
+- Security integration relocation: #36
+- Direct dependency audit: #37
+- CI dependency-boundary enforcement: #38
+
 ## 5.8.4 — 2026-08-21
 
 ### Changed

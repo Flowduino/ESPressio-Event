@@ -5,6 +5,16 @@ on:
   pull_request:
 
 jobs:
+  dependency-boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Verify Event dependency boundaries
+        run: python tools/check_dependency_boundaries.py
+
   host-tests:
     runs-on: ubuntu-latest
     steps:
@@ -64,32 +74,12 @@ jobs:
           repository: Flowduino/ESPressio-Serializable
           ref: 0.10.2
           path: project/dependencies/ESPressio-Serializable
-      - uses: actions/checkout@v4
-        with:
-          repository: Flowduino/ESPressio-Security
-          ref: 0.2.0
-          path: project/dependencies/ESPressio-Security
-      - uses: actions/checkout@v4
-        with:
-          repository: Flowduino/ESPressio-Command
-          ref: 0.3.0
-          path: project/dependencies/ESPressio-Command
-      - uses: actions/checkout@v4
-        with:
-          repository: Flowduino/ESPressio-Sockets
-          ref: 0.5.0
-          path: project/dependencies/ESPressio-Sockets
-      - uses: actions/checkout@v4
-        with:
-          repository: Flowduino/ESPressio-ESP-Now
-          ref: 0.5.3
-          path: project/dependencies/ESPressio-ESP-Now
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       - name: Install PlatformIO
         run: pip install platformio
-      - name: Create bridge compile project
+      - name: Create Event mechanism compile project
         shell: bash
         run: |
           mkdir -p project/compile/src
@@ -101,10 +91,6 @@ jobs:
           build_flags =
               -std=gnu++17
               -frtti
-              -I../dependencies/ESPressio-Security/src
-              -I../dependencies/ESPressio-Command/src
-              -I../dependencies/ESPressio-Sockets/src
-              -I../dependencies/ESPressio-ESP-Now/src
           build_unflags =
               -std=gnu++11
               -fno-rtti
@@ -119,16 +105,15 @@ jobs:
           EOF
           cat > project/compile/src/main.cpp <<'EOF'
           #include <Arduino.h>
-          #include <WiFi.h>
+          #include <ESPressio_Event.hpp>
           #include <ESPressio_EventTransport.hpp>
-          #include <ESPressio_TransportSecurityEventBridge.hpp>
-          #include <ESPressio_CommandRegistryEventBridge.hpp>
-          #include <ESPressio_SocketWorkerEventBridge.hpp>
-          #include <ESPressio_SocketSecuritySessionEventBridge.hpp>
-          #include <ESPressio_ESPNowTransportEventBridge.hpp>
+          #include <ESPressio_SystemClockEventBridge.hpp>
+          #include <ESPressio_ThreadEventBridges.hpp>
+          #include <ESPressio_SystemClockEventBridge_Serializable.hpp>
+          #include <ESPressio_ThreadEventBridges_Serializable.hpp>
 
           void setup() {}
           void loop() {}
           EOF
-      - name: Compile ESP32 Event Transport and optional bridges
+      - name: Compile ESP32 Event mechanism and legitimate downstream bridges
         run: pio run -d project/compile
