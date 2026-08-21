@@ -77,7 +77,7 @@ EVENT
 └── Event 5.8.2
 
 DIAGNOSTICS / OPERATOR
-└── Serial 0.5.1 (release candidate)
+└── Serial 0.5.1
 ```
 
 ## Circular-dependency audit
