@@ -4,7 +4,64 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
+  migration-normalize:
+    if: github.event_name == 'pull_request' && github.head_ref == 'maintenance/47-repository-migration' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: maintenance/47-repository-migration
+      - name: Normalize repository identity
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          skip = {Path('.github/workflows/tests.yml'), Path('.github/workflows/migration-normalize.yml')}
+          replacements = [
+              ('https://github.com/Flowduino/', 'https://github.com/ESPressio-Development-Platform/'),
+              ('https://github.com/flowduino/', 'https://github.com/ESPressio-Development-Platform/'),
+              ('flowduino/ESPressio-', 'espressio-development-platform/ESPressio-'),
+              ('Flowduino/ESPressio-', 'ESPressio-Development-Platform/ESPressio-'),
+              ('https://flowduino.com', 'https://espressio.org'),
+              ('http://flowduino.com', 'https://espressio.org'),
+              ('Flowduino.com', 'espressio.org'),
+              ('flowduino.com', 'espressio.org'),
+              ('Flowduino ESPressio Development Platform', 'ESPressio Development Platform'),
+              ('Flowduino ESPressio-', 'ESPressio-'),
+              ('"name": "Flowduino"', '"name": "Simon J. Stuart"'),
+              ('"owner": "flowduino"', '"owner": "espressio-development-platform"'),
+          ]
+          changed = []
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts or path in skip:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError, OSError):
+                  continue
+              updated = text
+              for old, new in replacements:
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(str(path))
+          print('\n'.join(changed))
+          PY
+      - name: Commit normalized repository
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Normalize remaining repository identity references (#47)'
+            git push
+          fi
+
   dependency-boundaries:
     runs-on: ubuntu-latest
     steps:
