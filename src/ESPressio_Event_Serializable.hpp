@@ -8,7 +8,7 @@
  */
 
 #if !__has_include(<ESPressio_Serializable.hpp>)
-    #error "ESPressio_Event_Serializable.hpp requires ESPressio-Serializable. Add flowduino/ESPressio-Serializable@^0.9.0 to the consuming project."
+    #error "ESPressio_Event_Serializable.hpp requires ESPressio-Serializable. Add espressio-development-platform/ESPressio-Serializable@^0.9.0 to the consuming project."
 #endif
 
 #include <ESPressio_Serializable.hpp>

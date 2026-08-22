@@ -1,6 +1,6 @@
 # ESPressio Event
 
-Generic Event-Driven Development infrastructure for the Flowduino ESPressio Development Platform.
+Generic Event-Driven Development infrastructure for the ESPressio Development Platform.
 
 ESPressio Event provides the asynchronous counterpart to ESPressio Observable: producers dispatch strongly typed data contracts without knowing which consumers exist, while listeners process those Events independently on Event-aware Threads.
 
@@ -132,14 +132,14 @@ PlatformIO:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Event@^6.0.0
+    espressio-development-platform/ESPressio-Event@^6.0.0
 ```
 
 For Serializable Events/Event Transport, also include:
 
 ```ini
 lib_deps =
-    flowduino/ESPressio-Serializable@^0.10.2
+    espressio-development-platform/ESPressio-Serializable@^0.10.2
 ```
 
 The current ESP32 implementation uses C++17 and RTTI. When the surrounding toolchain disables RTTI, enable it in the project configuration.
