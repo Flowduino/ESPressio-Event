@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: maintenance/47-repository-migration
-      - name: Normalize repository identity
+      - name: Normalize repository identity and dependency chart
         shell: bash
         run: |
           python - <<'PY'
@@ -34,6 +34,11 @@ jobs:
               ('Flowduino ESPressio-', 'ESPressio-'),
               ('"name": "Flowduino"', '"name": "Simon J. Stuart"'),
               ('"owner": "flowduino"', '"owner": "espressio-development-platform"'),
+              ('ESP-Now       0.7.0', 'ESP-Now       0.8.0'),
+              ('ESP-Now 0.7.0', 'ESP-Now 0.8.0'),
+              ('ESP-Now >= 0.7.0', 'ESP-Now >= 0.8.0'),
+              ('Serial        0.7.1', 'Serial        0.7.2'),
+              ('Serial 0.7.1', 'Serial 0.7.2'),
           ]
           changed = []
           for path in Path('.').rglob('*'):
@@ -51,6 +56,15 @@ jobs:
                   changed.append(str(path))
           print('\n'.join(changed))
           PY
+      - name: Audit residual legacy references
+        shell: bash
+        run: |
+          matches=$(grep -R -n -i 'flowduino' . --exclude-dir=.git --exclude=tests.yml --exclude=migration-normalize.yml || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo
+            echo 'Residual references above must be reviewed. Stable flowduino.* wire type identifiers may be intentional.'
+          fi
       - name: Commit normalized repository
         shell: bash
         run: |
