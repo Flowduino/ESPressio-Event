@@ -3,9 +3,9 @@
     "description": "Event-Pattern library for ESP32-family microcontrollers",
     "keywords": "event,events,event-driven,event pattern,pattern,design pattern,async,callback,watcher,notifier,observable,bridge,espressio",
     "authors": {
-        "name": "Flowduino",
+        "name": "Simon J. Stuart",
         "maintainer": true,
-        "url": "https://flowduino.com"
+        "url": "https://espressio.org"
     },
     "build": {
         "flags": [
@@ -19,7 +19,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/Flowduino/ESPressio-Event.git"
+        "url": "https://github.com/ESPressio-Development-Platform/ESPressio-Event.git"
     },
     "version": "6.0.0",
     "license": "Apache-2.0",
@@ -29,17 +29,17 @@
         {
             "name": "ESPressio-Threads",
             "version": ">=3.1.4 <4.0.0",
-            "url": "https://github.com/Flowduino/ESPressio-Threads.git",
+            "url": "https://github.com/ESPressio-Development-Platform/ESPressio-Threads.git",
             "platforms": "espressif32"
         },
         {
-            "name": "Flowduino ESPressio-Observable",
+            "name": "ESPressio-Observable",
             "version": ">=3.0.1 <4.0.0",
-            "url": "https://github.com/Flowduino/ESPressio-Observable.git",
+            "url": "https://github.com/ESPressio-Development-Platform/ESPressio-Observable.git",
             "platforms": "*"
         },
         {
-            "owner": "flowduino",
+            "owner": "espressio-development-platform",
             "name": "ESPressio-Timing",
             "version": ">=2.2.4 <3.0.0"
         }
